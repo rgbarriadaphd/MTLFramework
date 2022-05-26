@@ -1,0 +1,101 @@
+"""
+# Author: ruben
+# Date: 23/5/22
+# Project: MTLFramework
+# File: mtl_dataset.py
+
+Description: Class that implements Multi-Task Learning dataset
+"""
+import logging
+
+from torch.utils.data import Dataset
+import torch
+from itertools import cycle
+from torchvision import datasets, transforms
+from PIL import Image, ImageStat
+from constants.path_constants import *
+
+
+class CustomImageFolder(datasets.ImageFolder):
+    """
+    Custom ImageFolder class. Workaround to swap class index assignment.
+    """
+
+    def __init__(self, dataset, transform=None, class_values=None):
+        """
+        :param dataset: (str) Dataset path
+        :param transform: (torch.transforms) Set of transforms to be applied to input data
+        :param class_values: (dict) definition of classes and numeric value used by the model
+        """
+        super(CustomImageFolder, self).__init__(dataset, transform=transform)
+        if class_values:
+            self.class_to_idx = class_values
+
+    def __getitem__(self, index):
+        """
+        Extended method of ImageFolder
+        :param index: (int) image index
+        :return: Image, label and data info
+        """
+        sample, label = super(datasets.ImageFolder, self).__getitem__(index)
+        return sample, label, index
+
+
+def load_and_transform_data(stage, batch_size=[1, 1], shuffle=False):
+    """
+    Loads a dataset and applies the corresponding transformations
+    :param stage: (str) Dataset to be loaded based on stage: train, test, validation (if any)
+    :param batch_size: (list of int) number of batch for CAC and DR datasets
+    :param shuffle: (list of int) shuffle samples order within datasets
+    """
+    assert stage in ['train', 'test']
+    # TODO: apply custom normalization
+
+    data_transforms = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    # Loading CAC dataset and generate dataloader
+    cac_dataset_path = os.path.join("../", CAC_DATASET_FOLDER, 'train')
+    cac_dataset = CustomImageFolder(cac_dataset_path,
+                                    class_values={'CACSmenos400': 0, 'CACSmas400': 1},
+                                    transform=data_transforms)
+    cac_data_loader = torch.utils.data.DataLoader(cac_dataset,
+                                                  batch_size=batch_size[0],
+                                                  shuffle=shuffle,
+                                                  num_workers=4)
+    print(f'Loaded {len(cac_dataset)} images under {cac_dataset_path}: Classes: {cac_dataset.class_to_idx}')
+
+    # Loading DR dataset and generate dataloader
+
+    dr_dataset_path = os.path.join("../", DR_DATASET_FOLDER, 'train')
+    dr_dataset = CustomImageFolder(dr_dataset_path,
+                                   transform=data_transforms)
+
+    dr_data_loader = torch.utils.data.DataLoader(dr_dataset,
+                                                 batch_size=batch_size[1],
+                                                 shuffle=shuffle,
+                                                 num_workers=4)
+
+    print(f'Loaded {len(dr_dataset)} images under {dr_dataset_path}: Classes: {dr_dataset.class_to_idx}')
+
+    return cac_data_loader, dr_data_loader
+
+
+if __name__ == '__main__':
+
+    cac_data_loader, dr_data_loader = load_and_transform_data(stage='train',
+                                                              batch_size=[8, 32],
+                                                              shuffle=False)
+
+    for i, (data1, data2) in enumerate(zip(cycle(cac_data_loader), dr_data_loader)):
+        image1 = data1[0]
+        lable1 = data1[1]
+        index1 = data1[2]
+
+        image2 = data2[0]
+        lable2 = data2[1]
+        index2 = data2[2]
+
+        print(index1, index2)
