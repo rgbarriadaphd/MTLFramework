@@ -87,15 +87,23 @@ if __name__ == '__main__':
 
     cac_data_loader, dr_data_loader = load_and_transform_data(stage='train',
                                                               batch_size=[8, 32],
-                                                              shuffle=False)
+                                                              shuffle=True)
 
-    for i, (data1, data2) in enumerate(zip(cycle(cac_data_loader), dr_data_loader)):
-        image1 = data1[0]
-        lable1 = data1[1]
-        index1 = data1[2]
+    epochs = 2
+    for i in range(epochs):
+        print(f'Epoch = {i}')
+        for i, (data1, data2) in enumerate(zip(cycle(cac_data_loader), dr_data_loader)):
+            image1 = data1[0]
+            label1 = data1[1]
+            index1 = data1[2]
 
-        image2 = data2[0]
-        lable2 = data2[1]
-        index2 = data2[2]
+            image2 = data2[0]
+            label2 = data2[1]
+            index2 = data2[2]
 
-        print(index1, index2)
+            print(f'CAC samples: {index1} | Labels: {label1}')
+            print(f'DR samples: {index2} | Labels: {label2}')
+            print("...")
+
+            # First train CAC batch + backprop with common loss
+            # First train DR batch + backprop with common loss
