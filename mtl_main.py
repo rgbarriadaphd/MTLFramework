@@ -43,11 +43,11 @@ def clean_folders():
     """
     answer_valid = False
     while not answer_valid:
-        value = input("Do you want to clear logs and models folders? (y/n):  ")
+        value = input("[WARNING] Do you want to clear logs and models folders? (y/n):  ")
         if value == 'y' or value == 'yes':
-            print("Deleting logs and model storage")
-            for f in os.listdir(MODELS_FOLDER):
-                shutil.rmtree(os.path.join(MODELS_FOLDER, f))
+            print("Deleting logs and train storage")
+            for f in os.listdir(TRAIN_FOLDER):
+                shutil.rmtree(os.path.join(TRAIN_FOLDER, f))
             for f in os.listdir(LOGS_FOLDER):
                 os.remove(os.path.join(LOGS_FOLDER, f))
             answer_valid = True
@@ -63,7 +63,7 @@ def init_log(date_time, action):
     :param date_time: (str) date time
     :param action: (str) action: train, test, exp
     """
-    logging.basicConfig(filename=os.path.join(LOGS_FOLDER, f'{action}_{ARCHITECTURE}_{date_time}.log'),
+    logging.basicConfig(filename=os.path.join(LOGS_FOLDER, f'{action}_{date_time}.log'),
                         level=logging.INFO,
                         format='[%(levelname)s] : %(message)s')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
@@ -85,6 +85,7 @@ def display_help():
 
 
 def main(args):
+    print(args)
     date_time = get_execution_time()
     try:
         if args[1] == '-tr':
