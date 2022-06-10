@@ -7,6 +7,7 @@
 Description: Class that implements Multi-Task Learning dataset
 """
 import logging
+import os.path
 
 from torch.utils.data import Dataset
 import torch
@@ -57,7 +58,7 @@ def load_and_transform_data(stage, batch_size=[1, 1], shuffle=False):
     ])
 
     # Loading CAC dataset and generate dataloader
-    cac_dataset_path = os.path.join("../", CAC_DATASET_FOLDER, 'train')
+    cac_dataset_path = os.path.join(os.path.abspath(CAC_DATASET_FOLDER), stage)
     cac_dataset = CustomImageFolder(cac_dataset_path,
                                     class_values={'CACSmenos400': 0, 'CACSmas400': 1},
                                     transform=data_transforms)
@@ -69,7 +70,7 @@ def load_and_transform_data(stage, batch_size=[1, 1], shuffle=False):
 
     # Loading DR dataset and generate dataloader
 
-    dr_dataset_path = os.path.join("../", DR_DATASET_FOLDER, 'train')
+    dr_dataset_path = os.path.join(os.path.abspath(DR_DATASET_FOLDER), stage)
     dr_dataset = CustomImageFolder(dr_dataset_path,
                                    transform=data_transforms)
 

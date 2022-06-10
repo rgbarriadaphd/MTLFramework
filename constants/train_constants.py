@@ -10,7 +10,7 @@ Description: Constants regarding train process management
 # Train hyperparameters
 # =======================
 
-EPOCHS = 500
+EPOCHS = 50
 BATCH_SIZE = 8
 LEARNING_RATE = 0.001
 LR_SCHEDULER = False

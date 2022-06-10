@@ -24,17 +24,15 @@ Hyperparams:
 Results:
 ---------------------
 
-train ($n_train) / test ($n_test)
-Normalization: (mean=$norm_mean, std=$norm_std)
-Elapsed time: train=$train_time, test=$test_time
-Precision: $precision
-Recall: $recall
+cac train ($cac_n_train) / cac test ($cac_n_test)
+dr train ($dr_n_train) / dr test ($dr_n_test)
 
 ====================
 Global Performance:
 ---------------------
-
 Elapsed total time: $execution_time.
+CAC accuracy: $cac_accuracy
+DR accuracy: $dr_accuracy
 Acc.: $model_accuracy
 
 
