@@ -1,11 +1,12 @@
 """
-# Author: ruben
-# Date: 23/5/22
+# Author: ruben 
+# Date: 14/6/22
 # Project: MTLFramework
-# File: mtl_dataset.py
+# File: base_dataset.py
 
-Description: Class that implements Multi-Task Learning dataset
+Description: Class that implements Base dataset (CAC scoring)
 """
+
 import logging
 import os.path
 
@@ -42,12 +43,12 @@ class CustomImageFolder(datasets.ImageFolder):
         return sample, label, index
 
 
-def load_and_transform_mtl_data(stage, batch_size=[1, 1], shuffle=False):
+def load_and_transform_base_data(stage, batch_size=1, shuffle=False):
     """
     Loads a dataset and applies the corresponding transformations
     :param stage: (str) Dataset to be loaded based on stage: train, test, validation (if any)
-    :param batch_size: (list of int) number of batch for CAC and DR datasets
-    :param shuffle: (list of int) shuffle samples order within datasets
+    :param batch_size: (int) number of batch for CAC and DR datasets
+    :param shuffle: (bool) shuffle samples order within datasets
     """
     assert stage in ['train', 'test']
     # TODO: apply custom normalization
@@ -63,48 +64,12 @@ def load_and_transform_mtl_data(stage, batch_size=[1, 1], shuffle=False):
                                     class_values={'CACSmenos400': 0, 'CACSmas400': 1},
                                     transform=data_transforms)
     cac_data_loader = torch.utils.data.DataLoader(cac_dataset,
-                                                  batch_size=batch_size[0],
+                                                  batch_size=batch_size,
                                                   shuffle=shuffle,
                                                   num_workers=4)
     print(f'Loaded {len(cac_dataset)} images under {cac_dataset_path}: Classes: {cac_dataset.class_to_idx}')
 
-    # Loading DR dataset and generate dataloader
-
-    dr_dataset_path = os.path.join(os.path.abspath(DR_DATASET_FOLDER), stage)
-    dr_dataset = CustomImageFolder(dr_dataset_path,
-                                   transform=data_transforms)
-
-    dr_data_loader = torch.utils.data.DataLoader(dr_dataset,
-                                                 batch_size=batch_size[1],
-                                                 shuffle=shuffle,
-                                                 num_workers=4)
-
-    print(f'Loaded {len(dr_dataset)} images under {dr_dataset_path}: Classes: {dr_dataset.class_to_idx}')
-
-    return cac_data_loader, dr_data_loader
+    return cac_data_loader
 
 
-if __name__ == '__main__':
 
-    cac_data_loader, dr_data_loader = load_and_transform_mtl_data(stage='train',
-                                                              batch_size=[8, 32],
-                                                              shuffle=True)
-
-    epochs = 2
-    for i in range(epochs):
-        print(f'Epoch = {i}')
-        for i, (data1, data2) in enumerate(zip(cycle(cac_data_loader), dr_data_loader)):
-            image1 = data1[0]
-            label1 = data1[1]
-            index1 = data1[2]
-
-            image2 = data2[0]
-            label2 = data2[1]
-            index2 = data2[2]
-
-            print(f'CAC samples: {index1} | Labels: {label1}')
-            print(f'DR samples: {index2} | Labels: {label2}')
-            print("...")
-
-            # First train CAC batch + backprop with common loss
-            # First train DR batch + backprop with common loss

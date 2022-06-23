@@ -31,9 +31,9 @@ dr train ($dr_n_train) / dr test ($dr_n_test)
 Global Performance:
 ---------------------
 Elapsed total time: $execution_time.
-CAC accuracy: $cac_accuracy
-DR accuracy: $dr_accuracy
-Acc.: $model_accuracy
+[MTL] CAC accuracy: $cac_accuracy
+[MTL] DR accuracy: $dr_accuracy
+[StA] CAC accuracy: $base_accuracy
 
 
 

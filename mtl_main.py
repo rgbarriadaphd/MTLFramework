@@ -16,7 +16,7 @@ import traceback
 from constants.path_constants import *
 from constants.train_constants import *
 
-from train_model import TrainModel
+from train_model import TrainMTLModel
 
 
 def train_model(date_time):
@@ -24,7 +24,7 @@ def train_model(date_time):
     Initializes train stage
     :param date_time: (str) date and time to identify execution
     """
-    tm = TrainModel(date_time=date_time)
+    tm = TrainMTLModel(date_time=date_time)
     tm.run()
 
 
