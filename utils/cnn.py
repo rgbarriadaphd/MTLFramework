@@ -20,6 +20,7 @@ from torch import optim
 from tqdm import tqdm
 from constants.train_constants import *
 from dataset.mtl_dataset import load_and_transform_data
+from utils.metrics import PerformanceMetrics
 
 
 def main():
@@ -231,12 +232,13 @@ def train_model(model, device, train_loaders):
     return model, (losses, train_accuracy_list, test_accuracy_list)
 
 
-def evaluate_model(model, device, test_loaders, max_eval=sys.maxsize, stage='test'):
+def evaluate_model(model, device, test_loaders, fold_id, max_eval=sys.maxsize, stage='test'):
     """
     Test the model with input parametrization
     :param model: (torch) Pytorch model
     :param device: (torch.cuda.device) Computing device
     :param test_loaders: (List torchvision.datasets) List of  train dataloader containing dataset images
+    :param fold_id: (int) Fold identifier. Just to return data.
     :param max_eval: (int) Maximum number of evaluation samples
     :return: (dict) model accuracy
     """
@@ -248,6 +250,8 @@ def evaluate_model(model, device, test_loaders, max_eval=sys.maxsize, stage='tes
 
     correct = 0
     total = 0
+    ground_array = []
+    prediction_array = []
 
     model.eval()
     with torch.no_grad():
@@ -259,6 +263,9 @@ def evaluate_model(model, device, test_loaders, max_eval=sys.maxsize, stage='tes
             outputs = model(sample)
             _, predicted = torch.max(outputs.data, 1)
 
+            ground_array.append(ground.item())
+            prediction_array.append(predicted.item())
+
             total += ground.size(0)
             correct += (predicted == ground).sum().item()
 
@@ -268,7 +275,23 @@ def evaluate_model(model, device, test_loaders, max_eval=sys.maxsize, stage='tes
 
     accuracy = 100 * correct / total
 
-    return accuracy
+    pm = PerformanceMetrics(ground=ground_array,
+                            prediction=prediction_array,
+                            percent=True,
+                            formatted=True)
+    confusion_matrix = pm.confusion_matrix()
+
+    performance = {
+        f'accuracy_{fold_id}': pm.accuracy(),
+        f'precision_{fold_id}': pm.precision(),
+        f'recall_{fold_id}': pm.recall(),
+        f'f1_{fold_id}': pm.f1(),
+        f'tn_{fold_id}': confusion_matrix[0],
+        f'fp_{fold_id}': confusion_matrix[1],
+        f'fn_{fold_id}': confusion_matrix[2],
+        f'tp_{fold_id}': confusion_matrix[3]
+    }
+    return performance, accuracy
 
 
 if __name__ == '__main__':

@@ -9,9 +9,9 @@ Description: Constants regarding train process management
 
 # Architecture parameters
 # =======================
-from constants.path_constants import CAC_DATASET_FOLDER, DR_DATASET_FOLDER
+from constants.path_constants import CAC_DATASET_FOLDER, DR_DATASET_FOLDER, DYNAMIC_RUN_FOLDER
 
-DATASETS = {'CAC': {'batch_size': 8, 'class_values': {'CACSmenos400': 0, 'CACSmas400': 1}, 'path': CAC_DATASET_FOLDER,
+DATASETS = {'CAC': {'batch_size': 8, 'class_values': {'CACSmenos400': 0, 'CACSmas400': 1}, 'path': DYNAMIC_RUN_FOLDER,
                     'selector': [1, 1, 0, 0, 0, 0, 0],
                     'normalization': {
                         'mean': [0.479, 0.241, 0.126],

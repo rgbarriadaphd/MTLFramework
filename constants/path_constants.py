@@ -27,6 +27,15 @@ assert os.path.exists(CAC_DATASET_FOLDER)
 DR_DATASET_FOLDER = os.path.join(INPUT_FOLDER, 'DR')
 assert os.path.exists(DR_DATASET_FOLDER)
 
+DYNAMIC_RUN_FOLDER = os.path.join(CAC_DATASET_FOLDER, 'dynamic_run')
+assert os.path.exists(DYNAMIC_RUN_FOLDER)
+
+ROOT_ORIGINAL_FOLDS = os.path.join(CAC_DATASET_FOLDER, 'folds')
+assert os.path.exists(ROOT_ORIGINAL_FOLDS)
+
+CAC_NEGATIVE = 'CACSmenos400'
+CAC_POSITIVE = 'CACSmas400'
+
 # Templates
 # =======================
 SUMMARY_TEMPLATE = 'templates/summary.tpl'
