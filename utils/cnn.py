@@ -7,8 +7,11 @@
 Description: Functions to deal with the cnn operations
 """
 import logging
+import math
 from itertools import cycle
 import sys
+import random
+import numpy as np
 
 import torch
 from torch import nn
@@ -16,8 +19,7 @@ from torchvision import models
 from torch import optim
 from tqdm import tqdm
 from constants.train_constants import *
-from dataset.base_dataset import load_and_transform_base_data
-from dataset.mtl_dataset import load_and_transform_mtl_data
+from dataset.mtl_dataset import load_and_transform_data
 
 
 def main():
@@ -29,30 +31,19 @@ class DLModel:
     Class to manage the architecture initialization
     """
 
-    def __init__(self, device, path=None, n_classes=2, load_model=False):
+    def __init__(self, device, path=None):
         """
         Architecture class constructor
         :param device: (torch.device) Running device
-        :param path: (str) If defined, then the model has to be loaded.
-        :param n_classes: (int) number of classes.
         """
-        self._model_path = path
         self._device = device
         self._model = None
+        n_classes = sum([len(DATASETS[dt]['class_values']) for dt in DATASETS])
 
         if MODEL_SEED > 0:
             torch.manual_seed(MODEL_SEED)
 
-        if load_model:
-            self._model = models.vgg16()
-            num_features = self._model.classifier[6].in_features
-            features = list(self._model.classifier.children())[:-1]  # Remove last layer
-            linear = nn.Linear(num_features, 5) # It is a DR model
-            features.extend([linear])
-            self._model.classifier = nn.Sequential(*features)
-            self._model.load_state_dict(torch.load(MODEL_PATH))
-        else:
-            self._model = models.vgg16(pretrained=True)
+        self._model = models.vgg16(pretrained=True)
 
         num_features = self._model.classifier[6].in_features
         features = list(self._model.classifier.children())[:-1]  # Remove last layer
@@ -62,10 +53,6 @@ class DLModel:
 
         for param in self._model.parameters():
             param.requires_grad = REQUIRES_GRAD
-
-        if self._model_path:
-            self._model.load_state_dict(torch.load(self._model_path, map_location=torch.device(self._device)))
-            logging.info(f'Loading architecture from {self._model_path}')
 
     def get(self):
         """
@@ -77,261 +64,128 @@ class DLModel:
 class MTLRetinalSelectorLoss(nn.Module):
     def __init__(self):
         super(MTLRetinalSelectorLoss, self).__init__()
-        self._selector = 0
+        self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self._n_classes = sum([len(DATASETS[dt]['class_values']) for dt in DATASETS])
 
-    def forward(self, preds, cac, dr):
-        self._selector = 0 if preds[1] is None else 1
+    def _softmax(self, x):
+        return torch.exp(x) / torch.sum(torch.exp(x), axis=0)
 
-        if self._selector == 0:
-            assert preds[self._selector] is not None
+    def _cross_entropy(self, y, y_pre, selector):
+        loss = -torch.sum(selector * (y * torch.log(y_pre) + (1 - y) * torch.log(1 - y_pre)))
+        return loss / float(y_pre.shape[0])
 
-            cac_cross_entropy = nn.CrossEntropyLoss()
-            cac_loss = cac_cross_entropy(preds[0], cac)
-            return cac_loss
-        else:
-            assert preds[self._selector] is not None
-            dr_cross_entropy = nn.CrossEntropyLoss()
-            dr_loss = dr_cross_entropy(preds[1], dr)
-            return dr_loss
+    def forward(self, predictions, grounds, dataset_names=None):
+        assert len(predictions) == len(grounds) == len(dataset_names)
+        loss = 0.0
 
-class MTLRetinalSumLoss(nn.Module):
-    def __init__(self):
-        super(MTLRetinalSumLoss, self).__init__()
-        self._selector = 0
+        for i in range(len(predictions)):
 
-    def forward(self, preds, cac, dr):
-        self._selector = 0 if preds[1] is None else 1
+            prediction = predictions[i]
+            ground = grounds[i]
+            data_type = dataset_names[i]
 
-        if self._selector == 0:
-            assert preds[self._selector] is not None
+            output_probs = self._softmax(prediction)
 
-            cac_cross_entropy = nn.CrossEntropyLoss()
-            cac_loss = cac_cross_entropy(preds[0], cac)
-            return cac_loss
-        else:
-            assert preds[self._selector] is not None
-            dr_cross_entropy = nn.CrossEntropyLoss()
-            dr_loss = dr_cross_entropy(preds[1], dr)
-            return dr_loss
+            one_hot_ground = torch.zeros(self._n_classes)
+            one_hot_ground[ground.item()] = 1.0
+            one_hot_ground = one_hot_ground.to(device=self._device)
+
+            selector = torch.tensor(DATASETS[data_type]['selector'])
+            selector = selector.to(device=self._device)
+
+            partial_loss = self._cross_entropy(one_hot_ground,
+                                               output_probs,
+                                               selector)
+            if math.isnan(partial_loss):
+                partial_loss = torch.tensor(0.0)
+                partial_loss = partial_loss.to(device=self._device)
+
+            # print("-----------------------------------")
+            # print(f'Pred: {prediction}')
+            # print(f'Softmax: {output_probs}')
+            # print(f'Labels: {ground}')
+            # print(f'Dataset: {data_type}')
+            # print(f'One hot ground: {one_hot_ground}')
+            # print(f'Selector: {selector}')
+            # print(f'Partial loss: {partial_loss}')
+            # print("-----------------------------------")
+            loss += partial_loss
+
+        # print(f'Total loss: {loss}')
+        # print("-----------------------------------")
+        return loss
 
 
-def train_mtl_model(model, device, cac_train_loader, dr_train_loader):
+def concat_datasets(batch_dataset_1, batch_dataset_2):
+    # Concatenate both datasets
+    concat_image = torch.cat((batch_dataset_1[0], batch_dataset_2[0]), 0)
+    concat_label = torch.cat((batch_dataset_1[1], batch_dataset_2[1]), 0)
+    concat_index = torch.cat((batch_dataset_1[2], batch_dataset_2[2]), 0)
+    concat_dt_name = batch_dataset_1[3] + batch_dataset_2[3]
+
+    before_shuffle_index = [concat_index[elem] for elem in range(len(concat_index))]
+
+    # Shuffle data
+    selection = list(range(len(concat_dt_name)))
+    random.shuffle(selection)
+
+    concat_image = concat_image[selection]
+    concat_label = concat_label[selection]
+    concat_index = concat_index[selection]
+    concat_dt_name = list(concat_dt_name)
+    concat_dt_name = [concat_dt_name[elem] for elem in selection]
+
+    # Chek shuffle
+    after_shuffle_index = [concat_index[selection.index(elem)] for elem in range(len(concat_index))]
+    assert before_shuffle_index == after_shuffle_index
+
+    return concat_image, concat_label, concat_index, concat_dt_name
+
+
+def train_model(model, device, train_loaders):
     """
     Trains the model with input parametrization
     :param model: (torchvision.models) Pytorch model
     :param device: (torch.cuda.device) Computing device
-    :param cac_train_loader: (torchvision.datasets) CAC Train dataloader containing dataset images
-    :param dr_train_loader: (torchvision.datasets) DR Train dataloader containing dataset images
+    :param train_loaders: (list torchvision.datasets) List of  train dataloader containing dataset images
     :return: train model, losses array, accuracies of test and train datasets
     """
-    n_cac_train = len(cac_train_loader.dataset)
-    n_dr_train = len(dr_train_loader.dataset)
-    logging.info(f'''Starting training:
-            Epochs:          {EPOCHS}
-            Batch size:      {BATCH_SIZE}
-            Learning rate:   {LEARNING_RATE}
-            CAC Training size:   {n_cac_train}
-            DR Training size:   {n_dr_train}
-            Device:          {device.type}
-            Criterion:       {CRITERION}
-            Optimizer:       {OPTIMIZER}
-        ''')
-
-    cac_losses = []
-    dr_losses = []
-    test_cac_accuracy_list = []
-    test_dr_accuracy_list = []
-    train_cac_accuracy_list = []
-    train_dr_accuracy_list = []
-
-    optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    if LOSS_CRITERION == 'selector_loss':
-        criterion = MTLRetinalSelectorLoss()
-    elif LOSS_CRITERION == 'sum_loss':
-        criterion = MTLRetinalSumLoss()
-
-    for epoch in range(EPOCHS):
-
-        model.train(True)
-        print(f'=================================== {epoch + 1} ===================================')
-
-        with tqdm(total=n_cac_train + n_dr_train, desc=f'Epoch {epoch + 1}/{EPOCHS}', unit='img') as pbar:
-
-            cac_running_loss = 0.0
-            dr_running_loss = 0.0
-            for i, (cac_batch, dr_batch) in enumerate(zip(cycle(cac_train_loader), dr_train_loader)):
-                # CAC batch ..................................................
-                cac_sample, cac_ground, cac_index = cac_batch
-                cac_sample = cac_sample.to(device=device, dtype=torch.float32)
-                cac_ground = cac_ground.to(device=device, dtype=torch.long)
-
-                current_cac_batch_size = cac_sample.size(0)
-                optimizer.zero_grad()
-                cac_prediction = model(cac_sample)
-
-                cac_loss = criterion((cac_prediction, None), cac_ground, None)
-                cac_loss.backward()
-                optimizer.step()
-                cac_running_loss += cac_loss.item() * current_cac_batch_size
-
-                # DR batch ..................................................
-                dr_sample, dr_ground, dr_index = dr_batch
-                dr_sample = dr_sample.to(device=device, dtype=torch.float32)
-                dr_ground = dr_ground.to(device=device, dtype=torch.long)
-
-                current_dr_batch_size = dr_sample.size(0)
-                optimizer.zero_grad()
-                dr_prediction = model(dr_sample)
-
-                dr_loss = criterion((None, dr_prediction), None, dr_ground)
-                dr_loss.backward()
-                optimizer.step()
-                dr_running_loss += dr_loss.item() * current_dr_batch_size
-
-                pbar.set_postfix(**{'CAC loss (batch) ': cac_loss.item(),
-                                    'DR loss (batch) ': dr_loss.item()})
-                pbar.update(current_cac_batch_size + current_dr_batch_size)
-
-        cac_epoch_loss = cac_running_loss / n_cac_train
-        dr_epoch_loss = dr_running_loss / n_dr_train
-
-        cac_losses.append(cac_epoch_loss)
-        dr_losses.append(dr_epoch_loss)
-
-        if SAVE_ACCURACY_PLOT:
-
-            for data_element in ['train', 'test']:
-                logging.info(f'....Evaluate [{data_element}] dataset accuracy')
-                print(f'    ..........Evaluate "{data_element}" dataset')
-                cac_control_dataloader, dr_control_dataloader = load_and_transform_mtl_data(stage=data_element,
-                                                                                            batch_size=[1, 1],
-                                                                                            shuffle=True)
-                cac_accuracy, dr_accuracy = evaluate_mtl_model(model,
-                                                               device,
-                                                               cac_control_dataloader,
-                                                               dr_control_dataloader,
-                                                               stage=data_element)
-                print(f'    ..........CAC acc.: {cac_accuracy}')
-                print(f'    ..........DR acc.: {dr_accuracy}')
-                if data_element == 'train':
-                    train_cac_accuracy_list.append(cac_accuracy)
-                    train_dr_accuracy_list.append(dr_accuracy)
-                else:
-                    test_cac_accuracy_list.append(cac_accuracy)
-                    test_dr_accuracy_list.append(dr_accuracy)
-
-    return model, (cac_losses, dr_losses), (train_cac_accuracy_list,
-                                            train_dr_accuracy_list,
-                                            test_cac_accuracy_list,
-                                            test_dr_accuracy_list)
-
-
-def evaluate_mtl_model(model, device, cac_test_loader, dr_test_loader, max_eval=sys.maxsize, stage='test'):
-    """
-    Test the model with input parametrization
-    :param model: (torch) Pytorch model
-    :param device: (torch.cuda.device) Computing device
-    :param cac_test_loader: (torchvision.datasets) CAC Test dataloader containing dataset images
-    :param dr_test_loader: (torchvision.datasets) DR Train dataloader containing dataset images
-    :param max_eval: (int) Maximum number of evaluation samples
-    :return: (dict) model performance including accuracy, precision, recall, F1-measure
-            and confusion matrix
-    """
-    n_cac_test = len(cac_test_loader.dataset)
-    n_dr_test = len(dr_test_loader.dataset)
-    logging.info(f'''Starting MTL testing:
-                CAC {stage} size:   {n_cac_test}
-                DR {stage} size:   {n_dr_test}
-                Device:          {device.type}
-            ''')
-
-    cac_correct = 0
-    cac_total = 0
-    dr_correct = 0
-    dr_total = 0
-
-    model.eval()
-    with torch.no_grad():
-        for i, cac_batch in enumerate(cac_test_loader):
-
-            cac_sample, cac_ground, cac_index = cac_batch
-            cac_sample = cac_sample.to(device=device, dtype=torch.float32)
-            cac_ground = cac_ground.to(device=device, dtype=torch.long)
-
-            outputs = model(cac_sample)
-            _, predicted = torch.max(outputs.data, 1)
-
-            # print(f'CAC sample [{cac_index}]Output: {outputs} | Ground: {cac_ground} Predicted: {predicted}')
-            # print(f'DR [{i}] Ground: {cac_ground.item()} Predicted: {predicted.item()}')
-
-            cac_total += cac_ground.size(0)
-            cac_correct += (predicted == cac_ground).sum().item()
-
-            if i > max_eval:
-                print(f'Max evaluatoin reached at: {max_eval} iterations')
-                break
-
-        for i, dr_batch in enumerate(dr_test_loader):
-
-            dr_sample, dr_ground, dr_index = dr_batch
-            dr_sample = dr_sample.to(device=device, dtype=torch.float32)
-            dr_ground = dr_ground.to(device=device, dtype=torch.long)
-
-            outputs = model(dr_sample)
-            _, predicted = torch.max(outputs.data, 1)
-
-            # print(f'DR sample [{dr_index[0]}]Output: {outputs} | Ground: {dr_ground} Predicted: {predicted}')
-            # print(f'DR [{i}] Ground: {dr_ground.item()} Predicted: {predicted.item()}')
-            dr_total += dr_ground.size(0)
-            dr_correct += (predicted == dr_ground).sum().item()
-
-            if i > max_eval:
-                print(f'Max evaluatoin reached at: {max_eval} iterations')
-                break
-
-    cac_accuracy = 100 * cac_correct / cac_total
-    dr_accuracy = 100 * dr_correct / dr_total
-
-    return cac_accuracy, dr_accuracy
-
-
-
-def train_base_model(model, device, train_loader):
-    """
-    Trains the model with input parametrization
-    :param model: (torchvision.models) Pytorch model
-    :param device: (torch.cuda.device) Computing device
-    :param train_loader: (torchvision.datasets) CAC Train dataloader containing dataset images
-    :return: train model, losses array, accuracies of test and train datasets
-    """
-    n_train = len(train_loader.dataset)
+    n_train = sum([len(train_loaders[i].dataset) for i in range(len(train_loaders))])
 
     logging.info(f'''Starting training:
             Epochs:          {EPOCHS}
-            Batch size:      {BATCH_SIZE}
+            Batch size:      {[(dt, DATASETS[dt]['batch_size']) for dt, values in DATASETS.items()]}
             Learning rate:   {LEARNING_RATE}
-            BASE Training size:   {n_train}
+            Training sizes:   {[(train_loaders[i].dataset.dataset_name, len(train_loaders[i].dataset)) for i in range(len(train_loaders))]}
             Device:          {device.type}
             Criterion:       {CRITERION}
             Optimizer:       {OPTIMIZER}
         ''')
 
     losses = []
-    train_accuracies = []
-    test_accuracies = []
+    test_accuracy_list = []
+    train_accuracy_list = []
 
     optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    criterion = nn.CrossEntropyLoss()
+    if CRITERION == 'CrossEntropyLoss':
+        criterion = nn.CrossEntropyLoss()
+    elif CRITERION == 'MTLRetinalSelectorLoss':
+        criterion = MTLRetinalSelectorLoss()
 
     for epoch in range(EPOCHS):
         model.train(True)
         running_loss = 0.0
-        with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{EPOCHS}', unit='img') as pbar:
+        print(f'------------- EPOCH: {epoch} -------------')
 
-            cac_running_loss = 0.0
-            dr_running_loss = 0.0
-            for i, batch in enumerate(train_loader):
-                sample, ground, index = batch
+        if len(DATASETS) > 1:
+            # Assuming CAC=0, DR=1
+            dataset_iterator = zip(cycle(train_loaders[0]), train_loaders[1])
+        else:
+            dataset_iterator = train_loaders[0]
+
+        with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{EPOCHS}', unit='img') as pbar:
+            for i, batch in enumerate(dataset_iterator):
+                sample, ground, index, dt_name = concat_datasets(batch[0], batch[1]) if len(DATASETS) > 1 else batch
                 sample = sample.to(device=device, dtype=torch.float32)
                 ground = ground.to(device=device, dtype=torch.long)
 
@@ -339,51 +193,56 @@ def train_base_model(model, device, train_loader):
                 optimizer.zero_grad()
                 prediction = model(sample)
 
-                loss = criterion(prediction, ground)
+                if CRITERION == 'CrossEntropyLoss':
+                    loss = criterion(prediction, ground)
+                elif CRITERION == 'MTLRetinalSelectorLoss':
+                    loss = criterion(prediction, ground, dt_name)
+
                 loss.backward()
                 optimizer.step()
+                if math.isnan(loss.item()):
+                    raise ValueError
 
                 running_loss += loss.item() * current_batch_size
 
                 pbar.set_postfix(**{'loss (batch) ': loss.item()})
-                pbar.update(sample.shape[0])
+                pbar.update(current_batch_size)
 
         epoch_loss = running_loss / n_train
+        print(f'EPOCH Loss : {epoch_loss}')
         losses.append(epoch_loss)
 
-
-        if SAVE_ACCURACY_PLOT:
-
+        # Check train and test datasets to verify train step
+        if CONTROL_TRAIN:
             for data_element in ['train', 'test']:
                 logging.info(f'....Evaluate [{data_element}] dataset accuracy')
-                dataloader = load_and_transform_base_data(stage=data_element,
-                                                          batch_size=1,
-                                                          shuffle=False)
-
-                accuracy = evaluate_base_model(model,
-                                               device,
-                                               dataloader)
+                print(f'    ..........Evaluate "{data_element}" dataset')
+                control_dataloader = load_and_transform_data(stage=data_element,
+                                                             shuffle=True)
+                accuracy = evaluate_model(model,
+                                          device,
+                                          control_dataloader,
+                                          stage=data_element)
                 if data_element == 'train':
-                    train_accuracies.append(accuracy)
+                    train_accuracy_list.append(accuracy)
                 else:
-                    test_accuracies.append(accuracy)
+                    test_accuracy_list.append(accuracy)
 
-    return model, losses, (train_accuracies, test_accuracies)
+    return model, (losses, train_accuracy_list, test_accuracy_list)
 
 
-def evaluate_base_model(model, device, test_loader):
+def evaluate_model(model, device, test_loaders, max_eval=sys.maxsize, stage='test'):
     """
     Test the model with input parametrization
     :param model: (torch) Pytorch model
     :param device: (torch.cuda.device) Computing device
-    :param test_loader: (torchvision.datasets) CAC Test dataloader containing dataset images
-    :return: (dict) model performance including accuracy, precision, recall, F1-measure
-            and confusion matrix
+    :param test_loaders: (List torchvision.datasets) List of  train dataloader containing dataset images
+    :param max_eval: (int) Maximum number of evaluation samples
+    :return: (dict) model accuracy
     """
-    n_test = len(test_loader.dataset)
-
-    logging.info(f'''Starting testing:
-                BASE test size:   {n_test}
+    n_test = sum([len(test_loaders[i].dataset) for i in range(len(test_loaders))])
+    logging.info(f'''Starting MTL testing:
+                Test sizes:   {[(test_loaders[i].dataset.dataset_name, len(test_loaders[i].dataset)) for i in range(len(test_loaders))]}
                 Device:          {device.type}
             ''')
 
@@ -392,24 +251,25 @@ def evaluate_base_model(model, device, test_loader):
 
     model.eval()
     with torch.no_grad():
-        for i, batch in enumerate(test_loader):
-
-            sample, ground, _ = batch
+        for i, batch in enumerate(test_loaders[0]):
+            sample, ground, index, dt_name = batch
             sample = sample.to(device=device, dtype=torch.float32)
             ground = ground.to(device=device, dtype=torch.long)
 
             outputs = model(sample)
             _, predicted = torch.max(outputs.data, 1)
 
-            # print(f'CAC sample [{cac_index}]Output: {outputs} | Ground: {cac_ground} Predicted: {predicted}')
-
             total += ground.size(0)
             correct += (predicted == ground).sum().item()
 
-    accuracy = (100 * correct) / total
+            if i > max_eval:
+                print(f'Max evaluation reached at: {max_eval} iterations')
+                break
 
-    print(f'BASE Accuracy: {accuracy} %')
+    accuracy = 100 * correct / total
+
     return accuracy
+
 
 if __name__ == '__main__':
     main()

@@ -21,19 +21,17 @@ Hyperparams:
 
 
 =====================
-Results:
+Dimensions :
 ---------------------
 
-cac train ($cac_n_train) / cac test ($cac_n_test)
-dr train ($dr_n_train) / dr test ($dr_n_test)
+Train: $n_train
+dr train: $n_test
 
 ====================
 Global Performance:
 ---------------------
 Elapsed total time: $execution_time.
 [MTL] CAC accuracy: $cac_accuracy
-[MTL] DR accuracy: $dr_accuracy
-[StA] CAC accuracy: $base_accuracy
 
 
 
