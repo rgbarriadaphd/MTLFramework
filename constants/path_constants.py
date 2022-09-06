@@ -35,6 +35,8 @@ assert os.path.exists(ROOT_ORIGINAL_FOLDS)
 
 CAC_NEGATIVE = 'CACSmenos400'
 CAC_POSITIVE = 'CACSmas400'
+TRAIN = 'train'
+TEST = 'test'
 
 # Templates
 # =======================

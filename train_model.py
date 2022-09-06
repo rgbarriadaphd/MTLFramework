@@ -19,8 +19,7 @@ from matplotlib.ticker import MaxNLocator
 
 from constants.train_constants import *
 from constants.path_constants import *
-from dataset.base_dataset import load_and_transform_base_data
-from dataset.mtl_dataset import load_and_transform_data
+from dataset.mtl_dataset import load_and_transform_data, get_custom_normalization
 from utils.cnn import DLModel, train_model, evaluate_model
 from utils.fold_handler import FoldHandler
 from utils.metrics import CrossValidationMeasures
@@ -66,6 +65,14 @@ class TrainMTLModel:
         self._fold_dataset = ROOT_ORIGINAL_FOLDS
 
         self._fold_handler = FoldHandler(self._fold_dataset, DYNAMIC_RUN_FOLDER)
+
+    def _get_normalization(self):
+        """
+        Retrieves custom normalization if defined.
+        :return: ((list) mean, (list) std) Normalized mean and std according to train dataset
+        """
+        # Generate custom mean and std normalization values from only train dataset
+        self._normalization = get_custom_normalization() if CUSTOM_NORMALIZED else (None, None)
 
     def _init_model(self):
         """
@@ -138,6 +145,7 @@ class TrainMTLModel:
         folds_acc = []
 
         for fold_id in range(1, 6):
+            print(f'***************************** Fold ID: {fold_id} *****************************')
             # Generate fold data
             train_data, test_data = self._fold_handler.generate_run_set(fold_id)
 
@@ -145,11 +153,17 @@ class TrainMTLModel:
             # Init model
             self._init_model()
 
+            # Get dataset normalization mean and std
+            self._get_normalization()
+
             # Train MTL model.
             # <--------------------------------------------------------------------->
             # Generate train data
             train_data_loaders = load_and_transform_data(stage='train',
-                                                         shuffle=True)
+                                                         shuffle=True,
+                                                         mean=self._normalization[0],
+                                                         std=self._normalization[1]
+                                                         )
             t0_fold_train = time.time()
             self._model, train_data = train_model(model=self._model,
                                                   device=self._device,
@@ -157,17 +171,20 @@ class TrainMTLModel:
                                                   )
             tf_fold_train = time.time() - t0_fold_train
 
-            self._save_csv_data(train_data)
+            self._save_csv_data(train_data, fold_id)
 
             # Test MTL model.
             # <--------------------------------------------------------------------->
             # Generate test data
             test_data_loaders = load_and_transform_data(stage='test',
+                                                        mean=self._normalization[0],
+                                                        std=self._normalization[1],
                                                         shuffle=False)  # shuffle does not matter for test
             t0_fold_test = time.time()
             fold_performance, fold_accuracy = evaluate_model(model=self._model,
                                                              device=self._device,
-                                                             test_loaders=test_data_loaders)
+                                                             test_loaders=test_data_loaders,
+                                                             fold_id=fold_id)
             tf_fold_test = time.time() - t0_fold_test
             folds_acc.append(fold_accuracy)
             # Update fold data
@@ -186,16 +203,16 @@ class TrainMTLModel:
             folds_performance.append(fold_performance)
 
             l_param = ["python plot/loss_plot.py", f'"Loss evolution (fold {fold_id})"', '"epochs, loss"', '"CAC loss"',
-                       f'{os.path.join(self._train_folder, "loss_" + fold_id + ".csv")}',
-                       f'{os.path.join(self._train_folder, "loss_" + fold_id + ".png")}']
+                       f'{os.path.join(self._train_folder, "loss_" + str(fold_id) + ".csv")}',
+                       f'{os.path.join(self._train_folder, "loss_" + str(fold_id) + ".png")}']
 
             call = ' '.join(l_param)
             os.system(call)
 
             if CONTROL_TRAIN:
-                l_param = ["python plot/loss_plot.py", '"Train progress(fold {fold_id})"', '"epochs, accuracy"', '"train, test"',
-                           f'{os.path.join(self._train_folder, "accuracy_on_train" + fold_id + ".csv")},{os.path.join(self._train_folder, "accuracy_on_test.csv")}',
-                           f'{os.path.join(self._train_folder, "accuracy" + fold_id + ".png")}']
+                l_param = ["python plot/loss_plot.py", f'"Train progress(fold {fold_id})"', '"epochs, accuracy"', '"train, test"',
+                           f'{os.path.join(self._train_folder, "accuracy_on_train" + str(fold_id) + ".csv")},{os.path.join(self._train_folder, "accuracy_on_test.csv")}',
+                           f'{os.path.join(self._train_folder, "accuracy" + str(fold_id) + ".png")}']
                 os.system(' '.join(l_param))
 
         # Compute global performance info
