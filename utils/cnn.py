@@ -173,10 +173,14 @@ def train_model(model, device, train_loaders):
     elif CRITERION == 'MTLRetinalSelectorLoss':
         criterion = MTLRetinalSelectorLoss()
 
+    inf_condition = False
     for epoch in range(EPOCHS):
+        # if inf_condition:
+        #     logging.info(f'outter INF condition at epoch {epoch + 1}')
+        #     break
         model.train(True)
         running_loss = 0.0
-        print(f'------------- EPOCH: {epoch} -------------')
+        print(f'------------- EPOCH: {epoch + 1} -------------')
 
         if len(DATASETS) > 1:
             # Assuming CAC=0, DR=1
@@ -186,6 +190,9 @@ def train_model(model, device, train_loaders):
 
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{EPOCHS}', unit='img') as pbar:
             for i, batch in enumerate(dataset_iterator):
+                # if inf_condition:
+                #     logging.info(f'inner INF condition at epoch {epoch + 1}')
+                #     break
                 sample, ground, index, dt_name = concat_datasets(batch[0], batch[1]) if len(DATASETS) > 1 else batch
                 sample = sample.to(device=device, dtype=torch.float32)
                 ground = ground.to(device=device, dtype=torch.long)
@@ -208,6 +215,9 @@ def train_model(model, device, train_loaders):
 
                 pbar.set_postfix(**{'loss (batch) ': loss.item()})
                 pbar.update(current_batch_size)
+
+                if loss.item() <= 0.0001:
+                    inf_condition = True
 
         epoch_loss = running_loss / n_train
         print(f'EPOCH Loss : {epoch_loss}')

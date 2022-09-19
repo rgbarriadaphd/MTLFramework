@@ -12,7 +12,7 @@ import shutil
 from distutils.dir_util import copy_tree
 from constants.path_constants import CAC_NEGATIVE, CAC_POSITIVE
 
-FOLD_ID = 'fold_'
+FOLD_ID = 'inner_fold_'
 
 
 class FoldHandler:

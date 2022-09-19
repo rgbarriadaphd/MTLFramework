@@ -15,7 +15,7 @@ import traceback
 
 from constants.path_constants import *
 from constants.train_constants import *
-
+from train_model_increased import TrainMTLModelFoldIncreased
 from train_model import TrainMTLModel
 
 
@@ -24,7 +24,10 @@ def train_model(date_time):
     Initializes train stage
     :param date_time: (str) date and time to identify execution
     """
-    tm = TrainMTLModel(date_time=date_time)
+    if INCREASED_FOLDS:
+        tm = TrainMTLModelFoldIncreased(date_time=date_time)
+    else:
+        tm = TrainMTLModel(date_time=date_time)
     tm.run()
 
 

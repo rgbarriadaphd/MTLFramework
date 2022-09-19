@@ -6,7 +6,6 @@ Global Configuration:
 ---------------------
 
 Architecture: $model
-Images: $image_type
 Normalized: $normalized
 Save model: $save_model
 Plot Loss: $plot_loss

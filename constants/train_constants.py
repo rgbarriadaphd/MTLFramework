@@ -19,7 +19,7 @@ DATASETS = {'CAC': {'batch_size': 8, 'class_values': {'CACSmenos400': 0, 'CACSma
                 'class_2': 4, 'class_3': 5, 'class_4': 6}, 'path': DR_DATASET_FOLDER,
                    'selector': [0, 0, 1, 1, 1, 1, 1],
                    }}
-# DATASETS = {'CAC': {'batch_size': 8, 'class_values': {'CACSmenos400': 0, 'CACSmas400': 1}, 'path': CAC_DATASET_FOLDER,
+# DATASETS = {'CAC': {'batch_size': 8, 'class_values': {'CACSmenos400': 0, 'CACSmas400': 1}, 'path': DYNAMIC_RUN_FOLDER,
 #                     'selector': [1, 1],
 #                     }}
 
@@ -31,7 +31,7 @@ WEIGHT_INIT = 'Seeded'  # Weight init . Supported --> ['KaimingUniform', 'Kaimin
 # Train hyperparameters
 # =======================
 
-EPOCHS = 2
+EPOCHS = 1
 LEARNING_RATE = 0.0001
 LR_SCHEDULER = False
 WEIGHT_DECAY = 4e-2
@@ -46,3 +46,5 @@ SAVE_MODEL = False  # True if model has to be saved
 SAVE_LOSS_PLOT = True  # True if loss plot has to be saved
 SAVE_ACCURACY_PLOT = True  # True if accuracy plot has to be saved
 ND = 2  # Number of decimals at outputs
+INCREASED_FOLDS = False
+N_INCREASED_FOLDS = 5

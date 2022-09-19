@@ -25,7 +25,7 @@ from utils.fold_handler import FoldHandler
 from utils.metrics import CrossValidationMeasures
 
 
-class TrainMTLModel:
+class TrainMTLModelFoldIncreased:
 
     def __init__(self, date_time):
         """
@@ -62,7 +62,7 @@ class TrainMTLModel:
         """
         Creates fold structure where train images will be split in 4 train folds + 1 test fold
         """
-        self._fold_dataset = os.path.join(ROOT_ORIGINAL_FOLDS, 'outter_fold_1')
+        self._fold_dataset = ROOT_ORIGINAL_FOLDS
         self._fold_handler = FoldHandler(self._fold_dataset, DYNAMIC_RUN_FOLDER)
 
     def _get_normalization(self):
