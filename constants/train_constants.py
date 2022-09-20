@@ -46,5 +46,5 @@ SAVE_MODEL = False  # True if model has to be saved
 SAVE_LOSS_PLOT = True  # True if loss plot has to be saved
 SAVE_ACCURACY_PLOT = True  # True if accuracy plot has to be saved
 ND = 2  # Number of decimals at outputs
-INCREASED_FOLDS = False
+
 N_INCREASED_FOLDS = 5
