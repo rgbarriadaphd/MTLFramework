@@ -26,8 +26,8 @@ Fold results:
 ---------------------
 
 Fold [$fold_id_1_1]: train ($n_train_1_1) / test ($n_test_1_1)
-	Normalization: (mean=$mean_1_1, std=$std_1_1)
-	Elapsed time: train=$fold_train_time_1_1, test=$fold_test_time_1_1
+	Normalization: (mean=$mean_1, std=$std_1)
+	Elapsed time: train=$fold_train_time_1, test=$fold_test_time_1_1
 	Accuracy: $accuracy_1_1
 	Precision: $precision_1_1
 	Recall: $recall_1_1

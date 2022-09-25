@@ -37,6 +37,7 @@ class TrainMTLModel:
 
         self._create_train_folder()
         self._init_device()
+        self._generate_fold_data()
 
     def _create_train_folder(self):
         """
@@ -57,12 +58,11 @@ class TrainMTLModel:
         self._device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         logging.info(f'Using device: {self._device}')
 
-    def _generate_fold_data(self, outer_fold_id):
+    def _generate_fold_data(self):
         """
         Creates fold structure where train images will be split in 4 train folds + 1 test fold
-        :param outer_fold_id: (int) Outer fold identifier
         """
-        self._fold_dataset = os.path.join(ROOT_ORIGINAL_FOLDS, 'outer_fold_{}'.format(outer_fold_id))
+        self._fold_dataset = os.path.join(ROOT_ORIGINAL_FOLDS, 'outter_fold_1')
         self._fold_handler = FoldHandler(self._fold_dataset, DYNAMIC_RUN_FOLDER)
 
     def _get_normalization(self):
@@ -71,7 +71,7 @@ class TrainMTLModel:
         :return: ((list) mean, (list) std) Normalized mean and std according to train dataset
         """
         # Generate custom mean and std normalization values from only train dataset
-        self._normalization = get_custom_normalization() if CUSTOM_NORMALIZED else ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        self._normalization = get_custom_normalization() if CUSTOM_NORMALIZED else (None, None)
 
     def _init_model(self):
         """
@@ -110,8 +110,7 @@ class TrainMTLModel:
         summary_template_values.update(global_performance)
 
         # Substitute values
-        tpl_file = SUMMARY_TEMPLATE.format(N_INCREASED_FOLDS)
-        with open(tpl_file, 'r') as f:
+        with open(SUMMARY_TEMPLATE.format(N_INCREASED_FOLDS), 'r') as f:
             src = Template(f.read())
             report = src.substitute(summary_template_values)
             logging.info(report)
@@ -144,25 +143,18 @@ class TrainMTLModel:
         folds_performance = []
         folds_acc = []
 
-        for outer_fold_id in range(1, N_INCREASED_FOLDS + 1):
-            self._generate_fold_data(outer_fold_id)
+        for outer_fold_id in range(1,N_INCREASED_FOLDS):
             for inner_fold_id in range(1, 6):
                 print(f'***************************** Fold ID: {outer_fold_id} - {inner_fold_id} *****************************')
                 # Generate fold data
-                t0 = time.time()
                 train_data, test_data = self._fold_handler.generate_run_set(inner_fold_id)
-                print(f'Generate run set: {time.time() - t0}s')
 
                 a = 0
                 # Init model
-                t0 = time.time()
                 self._init_model()
-                print(f'Init the model: {time.time() - t0}s')
 
                 # Get dataset normalization mean and std
-                t0 = time.time()
                 self._get_normalization()
-                print(f'Normalization: {time.time() - t0}s')
 
                 # Train MTL model.
                 # <--------------------------------------------------------------------->
@@ -192,8 +184,7 @@ class TrainMTLModel:
                 fold_performance, fold_accuracy = evaluate_model(model=self._model,
                                                                  device=self._device,
                                                                  test_loaders=test_data_loaders,
-                                                                 outer_fold_id=outer_fold_id,
-                                                                 inner_fold_id=inner_fold_id)
+                                                                 fold_id=inner_fold_id)
                 tf_fold_test = time.time() - t0_fold_test
                 folds_acc.append(fold_accuracy)
                 # Update fold data
