@@ -175,9 +175,9 @@ def train_model(model, device, train_loaders):
 
     inf_condition = False
     for epoch in range(EPOCHS):
-        # if inf_condition:
-        #     logging.info(f'outter INF condition at epoch {epoch + 1}')
-        #     break
+        if inf_condition:
+            logging.info(f'outter INF condition at epoch {epoch + 1}')
+            break
         model.train(True)
         running_loss = 0.0
         print(f'------------- EPOCH: {epoch + 1} -------------')
@@ -190,9 +190,9 @@ def train_model(model, device, train_loaders):
 
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{EPOCHS}', unit='img') as pbar:
             for i, batch in enumerate(dataset_iterator):
-                # if inf_condition:
-                #     logging.info(f'inner INF condition at epoch {epoch + 1}')
-                #     break
+                if inf_condition:
+                    logging.info(f'inner INF condition at epoch {epoch + 1}')
+                    break
                 sample, ground, index, dt_name = concat_datasets(batch[0], batch[1]) if len(DATASETS) > 1 else batch
                 sample = sample.to(device=device, dtype=torch.float32)
                 ground = ground.to(device=device, dtype=torch.long)
@@ -216,8 +216,11 @@ def train_model(model, device, train_loaders):
                 pbar.set_postfix(**{'loss (batch) ': loss.item()})
                 pbar.update(current_batch_size)
 
-                if loss.item() <= 0.0001:
+                if math.isinf(loss.item()):
                     inf_condition = True
+                    break
+
+
 
         epoch_loss = running_loss / n_train
         print(f'EPOCH Loss : {epoch_loss}')
@@ -242,13 +245,14 @@ def train_model(model, device, train_loaders):
     return model, (losses, train_accuracy_list, test_accuracy_list)
 
 
-def evaluate_model(model, device, test_loaders, fold_id, max_eval=sys.maxsize, stage='test'):
+def evaluate_model(model, device, test_loaders, outer_fold_id, inner_fold_id, max_eval=sys.maxsize, stage='test'):
     """
     Test the model with input parametrization
     :param model: (torch) Pytorch model
     :param device: (torch.cuda.device) Computing device
     :param test_loaders: (List torchvision.datasets) List of  train dataloader containing dataset images
-    :param fold_id: (int) Fold identifier. Just to return data.
+    :param outer_fold_id: (int) Outer fold identifier. Just to return data.
+    :param inner_fold_id: (int) Inner fold identifier. Just to return data.
     :param max_eval: (int) Maximum number of evaluation samples
     :return: (dict) model accuracy
     """
@@ -292,14 +296,14 @@ def evaluate_model(model, device, test_loaders, fold_id, max_eval=sys.maxsize, s
     confusion_matrix = pm.confusion_matrix()
 
     performance = {
-        f'accuracy_{fold_id}': pm.accuracy(),
-        f'precision_{fold_id}': pm.precision(),
-        f'recall_{fold_id}': pm.recall(),
-        f'f1_{fold_id}': pm.f1(),
-        f'tn_{fold_id}': confusion_matrix[0],
-        f'fp_{fold_id}': confusion_matrix[1],
-        f'fn_{fold_id}': confusion_matrix[2],
-        f'tp_{fold_id}': confusion_matrix[3]
+        f'accuracy_{outer_fold_id}_{inner_fold_id}': pm.accuracy(),
+        f'precision_{outer_fold_id}_{inner_fold_id}': pm.precision(),
+        f'recall_{outer_fold_id}_{inner_fold_id}': pm.recall(),
+        f'f1_{outer_fold_id}_{inner_fold_id}': pm.f1(),
+        f'tn_{outer_fold_id}_{inner_fold_id}': confusion_matrix[0],
+        f'fp_{outer_fold_id}_{inner_fold_id}': confusion_matrix[1],
+        f'fn_{outer_fold_id}_{inner_fold_id}': confusion_matrix[2],
+        f'tp_{outer_fold_id}_{inner_fold_id}': confusion_matrix[3]
     }
     return performance, accuracy
 

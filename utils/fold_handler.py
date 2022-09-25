@@ -1,7 +1,7 @@
 """
 # Author: ruben 
 # Date: 27/1/22
-# Project: MTLFramework
+# Project: CACFramework
 # File: fold_handler.py
 
 Description: Class to manage the change of test and train data when iteration over the input samples

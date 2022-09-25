@@ -41,4 +41,3 @@ TEST = 'test'
 # Templates
 # =======================
 SUMMARY_TEMPLATE = 'templates/summary_{}.tpl'
-assert os.path.exists(SUMMARY_TEMPLATE)
