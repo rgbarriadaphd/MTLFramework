@@ -40,7 +40,8 @@ TEST = 'test'
 
 # Templates
 # =======================
-SUMMARY_TEMPLATE = 'templates/summary_{}.tpl'
+BASE_SUMMARY_TEMPLATE = 'templates/summary_base.tpl'
+SUMMARY_TEMPLATE = 'templates/summary.tpl'
 SUMMARY_UNIQUE_FOLD_TEMPLATE = 'templates/fold.tpl'
 
 # Output Fodler

@@ -31,8 +31,13 @@ class TrainMTLModel:
         """
         self._date_time = date_time
         self._model = None
+        self._t0 = None
+        self._folds_performance = []
+        self._folds_acc = []
+        self._global_performance = {}
 
         self._create_train_folder()
+        self._generate_summary_template()
         self._init_device()
 
     def _create_train_folder(self):
@@ -74,7 +79,8 @@ class TrainMTLModel:
         :return: ((list) mean, (list) std) Normalized mean and std according to train dataset
         """
         # Generate custom mean and std normalization values from only train dataset
-        self._normalization = get_custom_normalization() if CUSTOM_NORMALIZED else ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        self._normalization = get_custom_normalization() if CUSTOM_NORMALIZED else (
+            [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
     def _init_model(self):
         """
@@ -84,7 +90,34 @@ class TrainMTLModel:
         self._model = DLModel(device=self._device).get()
         self._model.to(device=self._device)
 
-    def _save_train_summary(self, folds_performance=None, global_performance=None, unique_fold_performance=None,
+    def _generate_summary_template(self):
+        """
+        Generates the summray template on the fly based on number of outer running folds
+        """
+        # Read base template
+        # Substitute values
+        tmp_lines = []
+        min = N_INCREASED_FOLDS[0]
+        max = N_INCREASED_FOLDS[1]
+        with open(BASE_SUMMARY_TEMPLATE, 'r') as f:
+            lines = f.readlines()
+
+            for line in lines:
+                if any([elem in line for elem in [f'_{i}_' for i in range(1, 11)]]):
+
+                    for i in range(1, 11):
+                        if f'_{i}_' in line:
+                            n = i
+                            break
+                    if min <= n <= max:
+                        tmp_lines.append(line)
+                else:
+                    tmp_lines.append(line)
+        # Write tmpl
+        with open(SUMMARY_TEMPLATE, 'w') as f:
+            f.writelines(tmp_lines)
+
+    def _save_train_summary(self, unique_fold_performance=None,
                             outer_fold=None, inner_fold=None):
         """
         Writes performance summary
@@ -109,7 +142,9 @@ class TrainMTLModel:
             'optimizer': OPTIMIZER,
             'device': self._device,
             'require_grad': REQUIRES_GRAD,
-            'weight_init': WEIGHT_INIT
+            'weight_init': WEIGHT_INIT,
+            'outer_min': N_INCREASED_FOLDS[0],
+            'outer_max': N_INCREASED_FOLDS[1]
         }
 
         if unique_fold_performance:
@@ -128,11 +163,11 @@ class TrainMTLModel:
             out_path = os.path.join(self._fold_folder, f'summary_{outer_fold}_{inner_fold}.out')
             summary_template_values.update(aux_unique_fold_performance)
         else:
-            tpl_file = SUMMARY_TEMPLATE.format(N_INCREASED_FOLDS)
+            tpl_file = SUMMARY_TEMPLATE.format(N_INCREASED_FOLDS[0])
             out_path = os.path.join(self._train_folder, 'summary.out')
-            for fold in folds_performance:
+            for fold in self._folds_performance:
                 summary_template_values.update(fold)
-            summary_template_values.update(global_performance)
+            summary_template_values.update(self._global_performance)
 
         # Substitute values
         with open(tpl_file, 'r') as f:
@@ -160,24 +195,80 @@ class TrainMTLModel:
                 writer = csv.writer(f, delimiter=',')
                 writer.writerows([data])
 
+    def _plot_loss_curves(self, outer_fold_id, inner_fold_id):
+        """
+        Plot losses
+        """
+        l_param = ["python plot/loss_plot.py", f'"Loss evolution (fold {outer_fold_id}-{inner_fold_id})"',
+                   '"epochs, loss"', '"CAC loss"',
+                   f'{os.path.join(self._csv_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
+                   f'{os.path.join(self._plot_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
+
+        call = ' '.join(l_param)
+        os.system(call)
+
+        if CONTROL_TRAIN:
+            l_param = ["python plot/loss_plot.py", f'"Train progress(fold {inner_fold_id})"',
+                       '"epochs, accuracy"', '"train, test"',
+                       f'{os.path.join(self._csv_folder, "accuracy_on_train" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")},{os.path.join(self._csv_folder, "accuracy_on_test.csv")}',
+                       f'{os.path.join(self._plot_folder, "accuracy" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
+            os.system(' '.join(l_param))
+
+    def _get_fold_perform_data(self, outer_fold_id, inner_fold_id, train_data_loaders, test_data_loaders, tf_fold_train,
+                               tf_fold_test):
+        """
+        Returns fold data in dict format
+        """
+        return {
+            f'fold_id_{outer_fold_id}_{inner_fold_id}': inner_fold_id,
+            f'n_train_{outer_fold_id}_{inner_fold_id}': [
+                (train_data_loaders[i].dataset.dataset_name, len(train_data_loaders[i].dataset)) for i in
+                range(len(train_data_loaders))],
+            f'n_test_{outer_fold_id}_{inner_fold_id}': [
+                (test_data_loaders[i].dataset.dataset_name, len(test_data_loaders[i].dataset)) for i in
+                range(len(test_data_loaders))],
+            f'mean_{outer_fold_id}_{inner_fold_id}': f'[{self._normalization[0][0]:.{ND}f}, {self._normalization[0][1]:.{ND}f}, {self._normalization[0][2]:.{ND}f}]',
+            f'std_{outer_fold_id}_{inner_fold_id}': f'[{self._normalization[1][0]:.{ND}f}, {self._normalization[1][1]:.{ND}f}, {self._normalization[1][2]:.{ND}f}]',
+            f'fold_train_time_{outer_fold_id}_{inner_fold_id}': f'{tf_fold_train:.{ND}f}',
+            f'fold_test_time_{outer_fold_id}_{inner_fold_id}': f'{tf_fold_test:.{ND}f}',
+        }
+
+    def _compute_cross_validation_performance(self, folds_acc):
+        """
+        Computes cross validation metrics and returns in
+        """
+        # Compute global performance info
+        cvm = CrossValidationMeasures(measures_list=self._folds_acc, percent=True, formatted=True)
+        f_acc = '['
+        for p, fa in enumerate(self._folds_acc):
+            f_acc += f'{fa:.{ND}f}'
+            if (p + 1) != len(self._folds_acc):
+                f_acc += ','
+        f_acc += ']'
+        return {
+            'folds_accuracy': f_acc,
+            'cross_v_mean': cvm.mean(),
+            'cross_v_stddev': cvm.stddev(),
+            'cross_v_interval': cvm.interval(),
+            'execution_time': str(timedelta(seconds=time.time() - self._t0))
+        }
+
     def run(self):
         """
         Run train stage
         """
-        t0 = time.time()
-        folds_performance = []
-        folds_acc = []
+        self._t0 = time.time()
 
-        for outer_fold_id in range(1, N_INCREASED_FOLDS + 1):
-            self._generate_fold_data(outer_fold_id)
+        for outer_fold_id in range(N_INCREASED_FOLDS[0], N_INCREASED_FOLDS[1] + 1):
+            # self._generate_fold_data(outer_fold_id)
             for inner_fold_id in range(1, 6):
-                print(f'***************************** Fold ID: {outer_fold_id} - {inner_fold_id} *****************************')
+                print(
+                    f'***************************** Fold ID: {outer_fold_id} - {inner_fold_id} *****************************')
                 # Generate fold data
                 t0 = time.time()
-                self._fold_handler.generate_run_set(inner_fold_id)
+                # self._fold_handler.generate_run_set(inner_fold_id)
                 print(f'Generate run set: {time.time() - t0}s')
 
-                a = 0
                 # Init model
                 t0 = time.time()
                 self._init_model()
@@ -220,65 +311,24 @@ class TrainMTLModel:
                                                                  inner_fold_id=inner_fold_id)
                 tf_fold_test = time.time() - t0_fold_test
 
-                folds_acc.append(fold_accuracy)
+                self._folds_acc.append(fold_accuracy)
+
+                fold_data = self._get_fold_perform_data(outer_fold_id, inner_fold_id, train_data_loaders,
+                                                        test_data_loaders, tf_fold_train,
+                                                        tf_fold_test)
                 # Update fold data
-                fold_data = {
-                    f'fold_id_{outer_fold_id}_{inner_fold_id}': inner_fold_id,
-                    f'n_train_{outer_fold_id}_{inner_fold_id}': [(train_data_loaders[i].dataset.dataset_name, len(train_data_loaders[i].dataset)) for i in
-                                range(len(train_data_loaders))],
-                    f'n_test_{outer_fold_id}_{inner_fold_id}': [(test_data_loaders[i].dataset.dataset_name, len(test_data_loaders[i].dataset)) for i in
-                               range(len(test_data_loaders))],
-                    f'mean_{outer_fold_id}_{inner_fold_id}': f'[{self._normalization[0][0]:.{ND}f}, {self._normalization[0][1]:.{ND}f}, {self._normalization[0][2]:.{ND}f}]',
-                    f'std_{outer_fold_id}_{inner_fold_id}': f'[{self._normalization[1][0]:.{ND}f}, {self._normalization[1][1]:.{ND}f}, {self._normalization[1][2]:.{ND}f}]',
-                    f'fold_train_time_{outer_fold_id}_{inner_fold_id}': f'{tf_fold_train:.{ND}f}',
-                    f'fold_test_time_{outer_fold_id}_{inner_fold_id}': f'{tf_fold_test:.{ND}f}',
-                }
-                fold_data = {
-                    f'fold_id_{outer_fold_id}_{inner_fold_id}': inner_fold_id,
-                    f'n_train_{outer_fold_id}_{inner_fold_id}': [
-                        ('CAC', 55)],
-                    f'n_test_{outer_fold_id}_{inner_fold_id}': [
-                        ('CAC', 20)],
-                    f'mean_{outer_fold_id}_{inner_fold_id}': f'[{self._normalization[0][0]:.{ND}f}, {self._normalization[0][1]:.{ND}f}, {self._normalization[0][2]:.{ND}f}]',
-                    f'std_{outer_fold_id}_{inner_fold_id}': f'[{self._normalization[1][0]:.{ND}f}, {self._normalization[1][1]:.{ND}f}, {self._normalization[1][2]:.{ND}f}]',
-                    f'fold_train_time_{outer_fold_id}_{inner_fold_id}': f'{0.569:.{ND}f}',
-                    f'fold_test_time_{outer_fold_id}_{inner_fold_id}': f'{0.5998:.{ND}f}',
-                }
                 fold_performance.update(fold_data)
                 # Save partial fold data
                 self._save_train_summary(unique_fold_performance=fold_performance,
                                          outer_fold=outer_fold_id,
                                          inner_fold=inner_fold_id)
-                folds_performance.append(fold_performance)
+                self._folds_performance.append(fold_performance)
 
-                l_param = ["python plot/loss_plot.py", f'"Loss evolution (fold {outer_fold_id}-{inner_fold_id})"', '"epochs, loss"', '"CAC loss"',
-                           f'{os.path.join(self._csv_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
-                           f'{os.path.join(self._plot_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
+                # Plot loss curves
+                self._plot_loss_curves(outer_fold_id, inner_fold_id)
 
-                call = ' '.join(l_param)
-                os.system(call)
+        # Compute global performance
+        self._global_performance = self._compute_cross_validation_performance()
 
-                if CONTROL_TRAIN:
-                    l_param = ["python plot/loss_plot.py", f'"Train progress(fold {inner_fold_id})"', '"epochs, accuracy"', '"train, test"',
-                               f'{os.path.join(self._csv_folder, "accuracy_on_train" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")},{os.path.join(self._csv_folder, "accuracy_on_test.csv")}',
-                               f'{os.path.join(self._plot_folder, "accuracy" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
-                    os.system(' '.join(l_param))
-
-        # Compute global performance info
-        cvm = CrossValidationMeasures(measures_list=folds_acc, percent=True, formatted=True)
-        f_acc = '['
-        for p, fa in enumerate(folds_acc):
-            f_acc += f'{fa:.{ND}f}'
-            if (p + 1) != len(folds_acc):
-                f_acc += ','
-        f_acc += ']'
-        global_performance = {
-            'execution_time': str(timedelta(seconds=time.time() - t0)),
-            'folds_accuracy': f_acc,
-            'cross_v_mean': cvm.mean(),
-            'cross_v_stddev': cvm.stddev(),
-            'cross_v_interval': cvm.interval()
-        }
-
-        self._save_train_summary(folds_performance=folds_performance,
-                                 global_performance=global_performance)
+        # Output final summary
+        self._save_train_summary()

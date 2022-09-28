@@ -10,6 +10,7 @@ Normalized: $normalized
 Save model: $save_model
 Plot Loss: $plot_loss
 Device: $device
+Cross validation: ($outer_min, $outer_max)-5 fold validation
 Require Grad: $require_grad
 Weights Init.: $weight_init
 Hyperparams:
@@ -390,6 +391,167 @@ Fold [$fold_id_7_5]: train ($n_train_7_5) / test ($n_test_7_5)
 	Confusion Matrix: $tn_7_5 , $fp_7_5
 	                  $fn_7_5 , $tp_7_5
 	                  
+===================================================================================
+
+Fold [$fold_id_8_1]: train ($n_train_8_1) / test ($n_test_8_1)
+	Normalization: (mean=$mean_8_1, std=$std_8_1)
+	Elapsed time: train=$fold_train_time_8_1, test=$fold_test_time_8_1
+	Accuracy: $accuracy_8_1
+	Precision: $precision_8_1
+	Recall: $recall_8_1
+	F1: $f1_8_1
+	Confusion Matrix: $tn_8_1 , $fp_8_1
+	                  $fn_8_1 , $tp_8_1
+
+Fold [$fold_id_8_2]: train ($n_train_8_2) / test ($n_test_8_2)
+	Normalization: (mean=$mean_8_2, std=$std_8_2)
+	Elapsed time: train=$fold_train_time_8_2, test=$fold_test_time_8_2
+	Accuracy: $accuracy_8_2
+	Precision: $precision_8_2
+	Recall: $recall_8_2
+	F1: $f1_8_2
+	Confusion Matrix: $tn_8_2 , $fp_8_2
+	                  $fn_8_2 , $tp_8_2
+
+Fold [$fold_id_8_3]: train ($n_train_8_3) / test ($n_test_8_3)
+	Normalization: (mean=$mean_8_3, std=$std_8_3)
+	Elapsed time: train=$fold_train_time_8_3, test=$fold_test_time_8_3
+	Accuracy: $accuracy_8_3
+	Precision: $precision_8_3
+	Recall: $recall_8_3
+	F1: $f1_8_3
+	Confusion Matrix: $tn_8_3 , $fp_8_3
+	                  $fn_8_3 , $tp_8_3
+
+Fold [$fold_id_8_4]: train ($n_train_8_4) / test ($n_test_8_4)
+	Normalization: (mean=$mean_8_4, std=$std_8_4)
+	Elapsed time: train=$fold_train_time_8_4, test=$fold_test_time_8_4
+	Accuracy: $accuracy_8_4
+	Precision: $precision_8_4
+	Recall: $recall_8_4
+	F1: $f1_8_4
+	Confusion Matrix: $tn_8_4 , $fp_8_4
+	                  $fn_8_4 , $tp_8_4
+
+Fold [$fold_id_8_5]: train ($n_train_8_5) / test ($n_test_8_5)
+	Normalization: (mean=$mean_8_5, std=$std_8_5)
+	Elapsed time: train=$fold_train_time_8_5, test=$fold_test_time_8_5
+	Accuracy: $accuracy_8_5
+	Precision: $precision_8_5
+	Recall: $recall_8_5
+	F1: $f1_8_5
+	Confusion Matrix: $tn_8_5 , $fp_8_5
+	                  $fn_8_5 , $tp_8_5
+
+===================================================================================
+
+
+Fold [$fold_id_9_1]: train ($n_train_9_1) / test ($n_test_9_1)
+	Normalization: (mean=$mean_9_1, std=$std_9_1)
+	Elapsed time: train=$fold_train_time_9_1, test=$fold_test_time_9_1
+	Accuracy: $accuracy_9_1
+	Precision: $precision_9_1
+	Recall: $recall_9_1
+	F1: $f1_9_1
+	Confusion Matrix: $tn_9_1 , $fp_9_1
+	                  $fn_9_1 , $tp_9_1
+
+Fold [$fold_id_9_2]: train ($n_train_9_2) / test ($n_test_9_2)
+	Normalization: (mean=$mean_9_2, std=$std_9_2)
+	Elapsed time: train=$fold_train_time_9_2, test=$fold_test_time_9_2
+	Accuracy: $accuracy_9_2
+	Precision: $precision_9_2
+	Recall: $recall_9_2
+	F1: $f1_9_2
+	Confusion Matrix: $tn_9_2 , $fp_9_2
+	                  $fn_9_2 , $tp_9_2
+
+Fold [$fold_id_9_3]: train ($n_train_9_3) / test ($n_test_9_3)
+	Normalization: (mean=$mean_9_3, std=$std_9_3)
+	Elapsed time: train=$fold_train_time_9_3, test=$fold_test_time_9_3
+	Accuracy: $accuracy_9_3
+	Precision: $precision_9_3
+	Recall: $recall_9_3
+	F1: $f1_9_3
+	Confusion Matrix: $tn_9_3 , $fp_9_3
+	                  $fn_9_3 , $tp_9_3
+
+Fold [$fold_id_9_4]: train ($n_train_9_4) / test ($n_test_9_4)
+	Normalization: (mean=$mean_9_4, std=$std_9_4)
+	Elapsed time: train=$fold_train_time_9_4, test=$fold_test_time_9_4
+	Accuracy: $accuracy_9_4
+	Precision: $precision_9_4
+	Recall: $recall_9_4
+	F1: $f1_9_4
+	Confusion Matrix: $tn_9_4 , $fp_9_4
+	                  $fn_9_4 , $tp_9_4
+
+Fold [$fold_id_9_5]: train ($n_train_9_5) / test ($n_test_9_5)
+	Normalization: (mean=$mean_9_5, std=$std_9_5)
+	Elapsed time: train=$fold_train_time_9_5, test=$fold_test_time_9_5
+	Accuracy: $accuracy_9_5
+	Precision: $precision_9_5
+	Recall: $recall_9_5
+	F1: $f1_9_5
+	Confusion Matrix: $tn_9_5 , $fp_9_5
+	                  $fn_9_5 , $tp_9_5
+
+===================================================================================
+
+
+Fold [$fold_id_10_1]: train ($n_train_10_1) / test ($n_test_10_1)
+	Normalization: (mean=$mean_10_1, std=$std_10_1)
+	Elapsed time: train=$fold_train_time_10_1, test=$fold_test_time_10_1
+	Accuracy: $accuracy_10_1
+	Precision: $precision_10_1
+	Recall: $recall_10_1
+	F1: $f1_10_1
+	Confusion Matrix: $tn_10_1 , $fp_10_1
+	                  $fn_10_1 , $tp_10_1
+
+Fold [$fold_id_10_2]: train ($n_train_10_2) / test ($n_test_10_2)
+	Normalization: (mean=$mean_10_2, std=$std_10_2)
+	Elapsed time: train=$fold_train_time_10_2, test=$fold_test_time_10_2
+	Accuracy: $accuracy_10_2
+	Precision: $precision_10_2
+	Recall: $recall_10_2
+	F1: $f1_10_2
+	Confusion Matrix: $tn_10_2 , $fp_10_2
+	                  $fn_10_2 , $tp_10_2
+
+Fold [$fold_id_10_3]: train ($n_train_10_3) / test ($n_test_10_3)
+	Normalization: (mean=$mean_10_3, std=$std_10_3)
+	Elapsed time: train=$fold_train_time_10_3, test=$fold_test_time_10_3
+	Accuracy: $accuracy_10_3
+	Precision: $precision_10_3
+	Recall: $recall_10_3
+	F1: $f1_10_3
+	Confusion Matrix: $tn_10_3 , $fp_10_3
+	                  $fn_10_3 , $tp_10_3
+
+Fold [$fold_id_10_4]: train ($n_train_10_4) / test ($n_test_10_4)
+	Normalization: (mean=$mean_10_4, std=$std_10_4)
+	Elapsed time: train=$fold_train_time_10_4, test=$fold_test_time_10_4
+	Accuracy: $accuracy_10_4
+	Precision: $precision_10_4
+	Recall: $recall_10_4
+	F1: $f1_10_4
+	Confusion Matrix: $tn_10_4 , $fp_10_4
+	                  $fn_10_4 , $tp_10_4
+
+Fold [$fold_id_10_5]: train ($n_train_10_5) / test ($n_test_10_5)
+	Normalization: (mean=$mean_10_5, std=$std_10_5)
+	Elapsed time: train=$fold_train_time_10_5, test=$fold_test_time_10_5
+	Accuracy: $accuracy_10_5
+	Precision: $precision_10_5
+	Recall: $recall_10_5
+	F1: $f1_10_5
+	Confusion Matrix: $tn_10_5 , $fp_10_5
+	                  $fn_10_5 , $tp_10_5
+
+	                  
+
+
 =================================
 Global Performance:
 ---------------------
