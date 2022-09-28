@@ -17,32 +17,6 @@ from constants.path_constants import *
 from constants.train_constants import *
 
 
-def get_custom_normalization():
-    """
-    Get normalization according to input train dataset
-    :return: ((list) mean, (list) std) Normalization values mean and std
-    """
-    target = os.path.join(DYNAMIC_RUN_FOLDER, TRAIN)
-
-    means = []
-    stds = []
-
-    for root, dirs, files in os.walk(target):
-        for file in files:
-            image_path = os.path.join(root, file)
-            assert os.path.exists(image_path)
-            with open(image_path, 'rb') as f:
-                img = Image.open(f)
-                img = img.convert('RGB')
-                stat = ImageStat.Stat(img)
-                local_mean = [stat.mean[0] / 255., stat.mean[1] / 255., stat.mean[2] / 255.]
-                local_std = [stat.stddev[0] / 255., stat.stddev[1] / 255., stat.stddev[2] / 255.]
-                means.append(local_mean)
-                stds.append(local_std)
-
-    return list(np.array(means).mean(axis=0)), list(np.array(stds).mean(axis=0))
-
-
 class CustomImageFolder(datasets.ImageFolder):
     """
     Custom ImageFolder class. Workaround to swap class index assignment.
@@ -75,7 +49,7 @@ class CustomImageFolder(datasets.ImageFolder):
         return sample, label, index, self.dataset_name
 
 
-def load_and_transform_data(stage, shuffle=False,mean=None, std=None):
+def load_and_transform_data(stage, shuffle=False, mean=None, std=None):
     """
     Loads a dataset and applies the corresponding transformations
     :param stage: (str) Dataset to be loaded based on stage: train, test, validation (if any)
@@ -98,7 +72,6 @@ def load_and_transform_data(stage, shuffle=False,mean=None, std=None):
 
     dataset_loaders = []
     for dataset_name, data in DATASETS.items():
-
         dataset_path = os.path.join(os.path.abspath(DATASETS[dataset_name]['path']), stage)
         dataset = CustomImageFolder(dataset_path,
                                     dataset_name,

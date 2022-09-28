@@ -10,13 +10,13 @@ import time
 from datetime import timedelta, datetime
 import csv
 from string import Template
-
+import json
 import torch
 import logging
 
 from constants.train_constants import *
 from constants.path_constants import *
-from dataset.mtl_dataset import load_and_transform_data, get_custom_normalization
+from dataset.mtl_dataset import load_and_transform_data
 from utils.cnn import DLModel, train_model, evaluate_model
 from utils.fold_handler import FoldHandler
 from utils.metrics import CrossValidationMeasures
@@ -73,14 +73,23 @@ class TrainMTLModel:
         self._fold_dataset = os.path.join(ROOT_ORIGINAL_FOLDS, 'outer_fold_{}'.format(outer_fold_id))
         self._fold_handler = FoldHandler(self._fold_dataset, DYNAMIC_RUN_FOLDER)
 
-    def _get_normalization(self):
+    def _get_normalization(self, outer_fold_id, inner_fold_id):
         """
-        Retrieves custom normalization if defined.
+        Retrieves custom normalization defined in json. The established by Pytorch otherwise.
+        :param outer_fold_id: (int) outer folder id
+        :param inner_fold_id: (int) inner folder id
         :return: ((list) mean, (list) std) Normalized mean and std according to train dataset
         """
         # Generate custom mean and std normalization values from only train dataset
-        self._normalization = get_custom_normalization() if CUSTOM_NORMALIZED else (
-            [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        if not CUSTOM_NORMALIZED or not os.path.exists(CAC_NORMALIZATION):
+            self._normalization = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            return
+
+        # Retrieve normalization file
+        with open(CAC_NORMALIZATION) as f:
+            normalization_data = json.load(f)
+        self._normalization = (normalization_data[outer_fold_id][inner_fold_id]['mean'],
+                               normalization_data[outer_fold_id][inner_fold_id]['std'])
 
     def _init_model(self):
         """
@@ -121,8 +130,6 @@ class TrainMTLModel:
                             outer_fold=None, inner_fold=None):
         """
         Writes performance summary
-        :param folds_performance: (dict) Contains fold performance data
-        :param global_performance: (dict) Contains global model performance data
         :param unique_fold_performance: (dict) Contains specific folder performance data
         :param outer_fold: (int) outer folder id
         :param inner_fold: (int) inner folder id
@@ -260,13 +267,13 @@ class TrainMTLModel:
         self._t0 = time.time()
 
         for outer_fold_id in range(N_INCREASED_FOLDS[0], N_INCREASED_FOLDS[1] + 1):
-            # self._generate_fold_data(outer_fold_id)
+            self._generate_fold_data(outer_fold_id)
             for inner_fold_id in range(1, 6):
                 print(
                     f'***************************** Fold ID: {outer_fold_id} - {inner_fold_id} *****************************')
                 # Generate fold data
                 t0 = time.time()
-                # self._fold_handler.generate_run_set(inner_fold_id)
+                self._fold_handler.generate_run_set(inner_fold_id)
                 print(f'Generate run set: {time.time() - t0}s')
 
                 # Init model

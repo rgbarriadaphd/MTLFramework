@@ -44,8 +44,12 @@ BASE_SUMMARY_TEMPLATE = 'templates/summary_base.tpl'
 SUMMARY_TEMPLATE = 'templates/summary.tpl'
 SUMMARY_UNIQUE_FOLD_TEMPLATE = 'templates/fold.tpl'
 
-# Output Fodler
+# Output Folder
 # =======================
 CSV_FOLDER = 'csv'
 PLOT_FOLDER = 'plots'
 FOLD_FOLDER = 'folds'
+
+# Normalization files
+# =======================
+CAC_NORMALIZATION = os.path.join(CAC_DATASET_FOLDER, 'normalization.json')
