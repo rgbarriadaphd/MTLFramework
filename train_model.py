@@ -14,9 +14,6 @@ from string import Template
 import torch
 import logging
 
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
-
 from constants.train_constants import *
 from constants.path_constants import *
 from dataset.mtl_dataset import load_and_transform_data, get_custom_normalization
@@ -43,8 +40,14 @@ class TrainMTLModel:
         Creates the folder where output data will be stored
         """
         self._train_folder = os.path.join(TRAIN_FOLDER, f'train_{self._date_time}')
+        self._plot_folder = os.path.join(self._train_folder, PLOT_FOLDER)
+        self._csv_folder = os.path.join(self._train_folder, CSV_FOLDER)
+        self._fold_folder = os.path.join(self._train_folder, FOLD_FOLDER)
         try:
             os.mkdir(self._train_folder)
+            os.mkdir(self._plot_folder)
+            os.mkdir(self._csv_folder)
+            os.mkdir(self._fold_folder)
         except OSError:
             logging.error("Creation of model directory %s failed" % self._train_folder)
         else:
@@ -81,11 +84,15 @@ class TrainMTLModel:
         self._model = DLModel(device=self._device).get()
         self._model.to(device=self._device)
 
-    def _save_train_summary(self, folds_performance, global_performance):
+    def _save_train_summary(self, folds_performance=None, global_performance=None, unique_fold_performance=None,
+                            outer_fold=None, inner_fold=None):
         """
-        Writes performance summnary
+        Writes performance summary
         :param folds_performance: (dict) Contains fold performance data
         :param global_performance: (dict) Contains global model performance data
+        :param unique_fold_performance: (dict) Contains specific folder performance data
+        :param outer_fold: (int) outer folder id
+        :param inner_fold: (int) inner folder id
         """
         # Global Configuration
         summary_template_values = {
@@ -105,19 +112,36 @@ class TrainMTLModel:
             'weight_init': WEIGHT_INIT
         }
 
-        for fold in folds_performance:
-            summary_template_values.update(fold)
-        summary_template_values.update(global_performance)
+        if unique_fold_performance:
+            aux_unique_fold_performance = {}
+            for key, value in unique_fold_performance.items():
+                # remove last indexes
+                key_split = key.split('_')
+                if key.startswith('fold_id_'):
+                    aux_unique_fold_performance['outer_fold_id'] = key_split[len(key_split) - 2]
+                    aux_unique_fold_performance['inner_fold_id'] = key_split[len(key_split) - 1]
+                    continue
+
+                aux_key = "_".join(key_split[:len(key_split) - 2])
+                aux_unique_fold_performance[aux_key] = value
+            tpl_file = SUMMARY_UNIQUE_FOLD_TEMPLATE
+            out_path = os.path.join(self._fold_folder, f'summary_{outer_fold}_{inner_fold}.out')
+            summary_template_values.update(aux_unique_fold_performance)
+        else:
+            tpl_file = SUMMARY_TEMPLATE.format(N_INCREASED_FOLDS)
+            out_path = os.path.join(self._train_folder, 'summary.out')
+            for fold in folds_performance:
+                summary_template_values.update(fold)
+            summary_template_values.update(global_performance)
 
         # Substitute values
-        tpl_file = SUMMARY_TEMPLATE.format(N_INCREASED_FOLDS)
         with open(tpl_file, 'r') as f:
             src = Template(f.read())
             report = src.substitute(summary_template_values)
             logging.info(report)
 
         # Write report
-        with open(os.path.join(self._train_folder, 'summary.out'), 'w') as f:
+        with open(out_path, 'w') as f:
             f.write(report)
 
     def _save_csv_data(self, train_data, outer_fold_id, inner_fold_id):
@@ -131,7 +155,7 @@ class TrainMTLModel:
         """
         for i, csv_name in enumerate(['loss', 'accuracy_on_train', 'accuracy_on_test']):
             data = train_data[i]
-            csv_path = os.path.join(self._train_folder, f'{csv_name}_{outer_fold_id}_{inner_fold_id}.csv')
+            csv_path = os.path.join(self._csv_folder, f'{csv_name}_{outer_fold_id}_{inner_fold_id}.csv')
             with open(csv_path, 'w') as f:
                 writer = csv.writer(f, delimiter=',')
                 writer.writerows([data])
@@ -150,7 +174,7 @@ class TrainMTLModel:
                 print(f'***************************** Fold ID: {outer_fold_id} - {inner_fold_id} *****************************')
                 # Generate fold data
                 t0 = time.time()
-                train_data, test_data = self._fold_handler.generate_run_set(inner_fold_id)
+                self._fold_handler.generate_run_set(inner_fold_id)
                 print(f'Generate run set: {time.time() - t0}s')
 
                 a = 0
@@ -195,6 +219,7 @@ class TrainMTLModel:
                                                                  outer_fold_id=outer_fold_id,
                                                                  inner_fold_id=inner_fold_id)
                 tf_fold_test = time.time() - t0_fold_test
+
                 folds_acc.append(fold_accuracy)
                 # Update fold data
                 fold_data = {
@@ -208,20 +233,35 @@ class TrainMTLModel:
                     f'fold_train_time_{outer_fold_id}_{inner_fold_id}': f'{tf_fold_train:.{ND}f}',
                     f'fold_test_time_{outer_fold_id}_{inner_fold_id}': f'{tf_fold_test:.{ND}f}',
                 }
+                fold_data = {
+                    f'fold_id_{outer_fold_id}_{inner_fold_id}': inner_fold_id,
+                    f'n_train_{outer_fold_id}_{inner_fold_id}': [
+                        ('CAC', 55)],
+                    f'n_test_{outer_fold_id}_{inner_fold_id}': [
+                        ('CAC', 20)],
+                    f'mean_{outer_fold_id}_{inner_fold_id}': f'[{self._normalization[0][0]:.{ND}f}, {self._normalization[0][1]:.{ND}f}, {self._normalization[0][2]:.{ND}f}]',
+                    f'std_{outer_fold_id}_{inner_fold_id}': f'[{self._normalization[1][0]:.{ND}f}, {self._normalization[1][1]:.{ND}f}, {self._normalization[1][2]:.{ND}f}]',
+                    f'fold_train_time_{outer_fold_id}_{inner_fold_id}': f'{0.569:.{ND}f}',
+                    f'fold_test_time_{outer_fold_id}_{inner_fold_id}': f'{0.5998:.{ND}f}',
+                }
                 fold_performance.update(fold_data)
+                # Save partial fold data
+                self._save_train_summary(unique_fold_performance=fold_performance,
+                                         outer_fold=outer_fold_id,
+                                         inner_fold=inner_fold_id)
                 folds_performance.append(fold_performance)
 
                 l_param = ["python plot/loss_plot.py", f'"Loss evolution (fold {outer_fold_id}-{inner_fold_id})"', '"epochs, loss"', '"CAC loss"',
-                           f'{os.path.join(self._train_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
-                           f'{os.path.join(self._train_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
+                           f'{os.path.join(self._csv_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
+                           f'{os.path.join(self._plot_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
 
                 call = ' '.join(l_param)
                 os.system(call)
 
                 if CONTROL_TRAIN:
                     l_param = ["python plot/loss_plot.py", f'"Train progress(fold {inner_fold_id})"', '"epochs, accuracy"', '"train, test"',
-                               f'{os.path.join(self._train_folder, "accuracy_on_train" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")},{os.path.join(self._train_folder, "accuracy_on_test.csv")}',
-                               f'{os.path.join(self._train_folder, "accuracy" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
+                               f'{os.path.join(self._csv_folder, "accuracy_on_train" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")},{os.path.join(self._csv_folder, "accuracy_on_test.csv")}',
+                               f'{os.path.join(self._plot_folder, "accuracy" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
                     os.system(' '.join(l_param))
 
         # Compute global performance info
@@ -240,4 +280,5 @@ class TrainMTLModel:
             'cross_v_interval': cvm.interval()
         }
 
-        self._save_train_summary(folds_performance, global_performance)
+        self._save_train_summary(folds_performance=folds_performance,
+                                 global_performance=global_performance)

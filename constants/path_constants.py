@@ -41,3 +41,10 @@ TEST = 'test'
 # Templates
 # =======================
 SUMMARY_TEMPLATE = 'templates/summary_{}.tpl'
+SUMMARY_UNIQUE_FOLD_TEMPLATE = 'templates/fold.tpl'
+
+# Output Fodler
+# =======================
+CSV_FOLDER = 'csv'
+PLOT_FOLDER = 'plots'
+FOLD_FOLDER = 'folds'

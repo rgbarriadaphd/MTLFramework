@@ -1,5 +1,5 @@
 """
-# Author: ruben 
+# Author: ruben
 # Date: 1/2/22
 # Project: CACFramework
 # File: metrics.py
@@ -7,10 +7,11 @@
 Description: Functions to provide performance metrics
 """
 import logging
+import random
 import statistics
 import math
 
-from constants.train_constants import ND
+ND = 2
 
 
 class CrossValidationMeasures:
@@ -235,31 +236,190 @@ class PerformanceMetrics:
             return f1
 
 
-if __name__ == '__main__':
-    # Test functions
-    mground = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    mprediction = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1]
-    pm = PerformanceMetrics(mground, mprediction, percent=True, formatted=True)
-    conf_matrix = pm.confusion_matrix()
-
-    assert conf_matrix[0] == 17
-    assert conf_matrix[1] == 2
-    assert conf_matrix[2] == 3
-    assert conf_matrix[3] == 8
-
-    print(f'TN: {conf_matrix[0]}')
-    print(f'FP: {conf_matrix[1]}')
-    print(f'FN: {conf_matrix[2]}')
-    print(f'TP: {conf_matrix[3]}')
-
-    print(f'Accuracy: {pm.accuracy()}')
-    print(f'Recall: {pm.recall()}')
-    print(f'Precision: {pm.precision()}')
-    print(f'F1-measure: {pm.f1()}')
-
-    measures = [0.51, 0.45, 0.78, 0.79, 0.82]
+def global_results(measures):
     cvm = CrossValidationMeasures(measures, percent=True, formatted=True)
+    mean = cvm.mean()
+    stddev = cvm.stddev()
+    ci = cvm.interval()
+    print('\\begin{figure}[H]')
+    print('\centering')
+    print("$Acc=\\begin{pmatrix}")
+    sacc = ''
+    for pos, elem in enumerate(measures):
 
-    print(f'Mean: {cvm.mean()}')
-    print(f'Std Dev: {cvm.stddev()}')
-    print(f'Interval: {cvm.interval()}')
+        if (pos + 1) % 5 == 0:
+            sacc += f'{elem:.{ND}f} \\\\'
+            print(sacc)
+            sacc = ''
+        else:
+            sacc += f'{elem:.{ND}f} & '
+
+    print("\end{pmatrix}$")
+    print('\end{figure}')
+    print()
+    print()
+    print("\\begin{table}[H]")
+    print('\centering')
+    print("\\begin{tabular}{|c|c|}")
+    print("	\hline")
+    print(f'	\\textbf{{Mean}} & {mean} \\\\')
+    print("	\hline")
+    print(f'	\\textbf{{Std Dev}} &  {stddev}\\\\')
+    print("	\hline")
+    print(f'	\\textbf{{CI(95\%)}} & {ci}\\\\')
+    print("	\hline")
+    print("\end{tabular}")
+    print("\label{tab:metrics}")
+    print("\end{table}")
+
+def by_outer_fold_results(measures):
+    print('\\begin{table}[H]')
+    print('\centering')
+    print('\\begin{tabular}{|c|c|c|c|}')
+    print('\hline')
+    print('\\textbf{Fold ID} & \\textbf{Mean} & \\textbf{Std Dev} & \\textbf{CI(95\%)}\\\\')
+    print('\hline')
+    acc = []
+    fold = 0
+    for pos, elem in enumerate(measures):
+        if (pos + 1) % 5 == 0:
+            fold += 1
+            acc.append(elem)
+            cvm = CrossValidationMeasures(acc, percent=True, formatted=True)
+            mean = cvm.mean()
+            stddev = cvm.stddev()
+            ci = cvm.interval()
+            print(f'\\textbf{{1-{fold}}} & {mean} & {stddev} & ${ci}$ \\\\')
+            print('\hline')
+            acc = []
+        else:
+            acc.append(elem)
+    print('\end{tabular}')
+    print('\end{table}')
+
+
+def comparison_global(measures_a, measures_b):
+    cvm_a = CrossValidationMeasures(measures_a, percent=True, formatted=True)
+    mean_a = cvm_a.mean()
+    stddev_a = cvm_a.stddev()
+    ci_a = cvm_a.interval()
+    cvm_b = CrossValidationMeasures(measures_b, percent=True, formatted=True)
+    mean_b = cvm_b.mean()
+    stddev_b = cvm_b.stddev()
+    ci_b = cvm_b.interval()
+    print('\\begin{table}[H]')
+    print('\centering')
+    print('\\begin{tabular}{|c|c|c|}')
+    print('\hline')
+    print('&  \\textbf{MTL} &  \\textbf{CAC}\\\\')
+    print('\hline')
+    print(f'\\textbf{{Mean}} & {mean_a} & {mean_b} \\\\')
+    print('\hline')
+    print(f'\\textbf{{Std Dev}} & {stddev_a} & {stddev_b} \\\\')
+    print('\hline')
+    print(f'\\textbf{{CI(95\%)}} & ${ci_a}$ & ${ci_b}$ \\\\')
+    print('\hline')
+    print('\end{tabular}')
+    print('\end{table}')
+
+def comparison_by_outer_fold_results(measures_a, measures_b):
+    """
+
+
+\multirow{2}{*}{\textbf{1-5}} & MTL & 6 & 230 & 12\\
+& CAC & 5 & 195 & 12\\
+\hline
+\hline
+\multirow{2}{*}{\textbf{1-5}} & MTL & 6 & 230 & 12\\
+& CAC & 5 & 195 & 12\\
+\hline
+\end{tabular}
+\end{table}
+    """
+    print('\\begin{table}[H]')
+    print('\centering')
+    print('\\begin{tabular}{|c|c|c|c|c|}')
+    print('\hline')
+    print('\\textbf{Fold ID} & \\textbf{Model} & \\textbf{Mean} & \\textbf{Std Dev} & \\textbf{CI(95\%)}\\\\')
+    print('\hline')
+
+    acc_a = []
+    acc_b = []
+    fold = 0
+    for pos, (a, b) in enumerate(zip(measures_a, measures_b)):
+        if (pos + 1) % 5 == 0:
+            fold += 1
+            acc_a.append(a)
+            acc_b.append(b)
+            cvm_a = CrossValidationMeasures(acc_a, percent=True, formatted=True)
+            mean_a = cvm_a.mean()
+            stddev_a = cvm_a.stddev()
+            ci_a = cvm_a.interval()
+            cvm_b = CrossValidationMeasures(acc_b, percent=True, formatted=True)
+            mean_b = cvm_b.mean()
+            stddev_b = cvm_b.stddev()
+            ci_b = cvm_b.interval()
+
+            print(f'\multirow{{2}}{{*}}{{\\textbf{{1-{fold}}}}} & MTL & {mean_a} & {stddev_a} & ${ci_a}$\\\\')
+            print(f'& CAC & {mean_b} & {stddev_b} & ${ci_b}$\\\\')
+            print('\hline')
+            print('\hline')
+
+            acc_a = []
+            acc_b = []
+        else:
+            acc_a.append(a)
+            acc_b.append(b)
+
+
+    print('\end{tabular}')
+    print('\end{table}')
+
+if __name__ == '__main__':
+    # # Test functions
+    # mground = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    # mprediction = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1]
+    # pm = PerformanceMetrics(mground, mprediction, percent=True, formatted=True)
+    # conf_matrix = pm.confusion_matrix()
+    #
+    # assert conf_matrix[0] == 17
+    # assert conf_matrix[1] == 2
+    # assert conf_matrix[2] == 3
+    # assert conf_matrix[3] == 8
+    #
+    # print(f'TN: {conf_matrix[0]}')
+    # print(f'FP: {conf_matrix[1]}')
+    # print(f'FN: {conf_matrix[2]}')
+    # print(f'TP: {conf_matrix[3]}')
+    #
+    # print(f'Accuracy: {pm.accuracy()}')
+    # print(f'Recall: {pm.recall()}')
+    # print(f'Precision: {pm.precision()}')
+    # print(f'F1-measure: {pm.f1()}')
+    #
+    # measures = [0.51, 0.45, 0.78, 0.79, 0.82]
+    # cvm = CrossValidationMeasures(measures, percent=True, formatted=True)
+    #
+    # print(f'Mean: {cvm.mean()}')
+    # print(f'Std Dev: {cvm.stddev()}')
+    # print(f'Interval: {}')
+
+    mtl_measures = [random.uniform(0, 1) for i in range(50)]
+    cac_measures = [random.uniform(0, 1) for i in range(50)]
+
+    print('\section{10-5 Cross Validation}')
+    print('\subsection{MTL}')
+    print('\subsubsection{Global Results}')
+    global_results(mtl_measures)
+    print('\subsubsection{By outer fold}')
+    by_outer_fold_results(mtl_measures)
+    print('\subsection{CAC}')
+    print('\subsubsection{Global Results}')
+    global_results(cac_measures)
+    print('\subsubsection{By outer fold}')
+    by_outer_fold_results(cac_measures)
+    print('\subsection{Comparison MTL vs. CAC}')
+    print('\subsubsection{Global Results}')
+    comparison_global(mtl_measures, cac_measures)
+    print('\subsubsection{By outer fold}')
+    comparison_by_outer_fold_results(mtl_measures, cac_measures)
