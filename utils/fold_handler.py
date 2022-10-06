@@ -30,6 +30,35 @@ class FoldHandler:
 
         logging.info(f'Running experiment based on {criteria} cross validation criteria')
 
+    def _check_sets(self, train_set, test_set):
+        """
+        Health test for running train and test set. None of the image used in train will be used for test in the same
+        iteration
+        :param train_set: (dict) train set
+        :param test_set: (dict) test set
+        """
+        train_set_cep = train_set['CEP']
+        train_set_cen = train_set['CEN']
+        assert len(train_set_cep) == len(set(train_set_cep))
+        assert len(train_set_cen) == len(set(train_set_cen))
+
+        test_set_cep = test_set['CEP']
+        test_set_cen = test_set['CEN']
+        assert len(test_set_cep) == len(set(test_set_cep))
+        assert len(test_set_cen) == len(set(test_set_cen))
+
+        train_all = train_set_cep + train_set_cen
+        test_all = test_set_cep + test_set_cen
+
+        intersection = list(set(train_all) & set(test_all))
+        assert len(intersection) == 0
+
+        # Double check just in case. Less efficient
+        for label_tr in train_set:
+            for image_tr in train_set[label_tr]:
+                for label_ts in test_set:
+                    assert image_tr not in test_set[label_ts]
+
     def generate_run_set(self, test_fold_id=1):
         """
         Organize folds split in train and test folds
@@ -72,5 +101,5 @@ class FoldHandler:
         train_set[CAC_POSITIVE] = [item.split('.')[0] for sublist in train_folds_mas for item in sublist]
         train_set[CAC_NEGATIVE] = [item.split('.')[0] for sublist in train_folds_menos for item in sublist]
 
+        self._check_sets(train_set, test_set)
         return train_set, test_set
-

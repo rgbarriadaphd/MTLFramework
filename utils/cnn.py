@@ -52,7 +52,7 @@ class DLModel:
         features.extend([linear])
         self._model.classifier = nn.Sequential(*features)
 
-        for param in self._model.parameters():
+        for param in self._model.features.parameters():
             param.requires_grad = REQUIRES_GRAD
 
     def get(self):
@@ -60,6 +60,9 @@ class DLModel:
         Return model
         """
         return self._model
+
+    def get_control_model(self):
+        return self._model.classifier[0].weight.sum().item()
 
 
 class MTLRetinalSelectorLoss(nn.Module):
@@ -143,7 +146,7 @@ def concat_datasets(batch_dataset_1, batch_dataset_2):
     return concat_image, concat_label, concat_index, concat_dt_name
 
 
-def train_model(model, device, train_loaders):
+def train_model(model, device, train_loaders, mean=None, std=None):
     """
     Trains the model with input parametrization
     :param model: (torchvision.models) Pytorch model
@@ -232,11 +235,15 @@ def train_model(model, device, train_loaders):
                 logging.info(f'....Evaluate [{data_element}] dataset accuracy')
                 print(f'    ..........Evaluate "{data_element}" dataset')
                 control_dataloader = load_and_transform_data(stage=data_element,
+                                                             mean=mean,
+                                                             std=std,
                                                              shuffle=True)
-                accuracy = evaluate_model(model,
-                                          device,
-                                          control_dataloader,
-                                          stage=data_element)
+                _, accuracy = evaluate_model(model=model,
+                                             device=device,
+                                             test_loaders=control_dataloader,
+                                             outer_fold_id=0,
+                                             inner_fold_id=0,
+                                             stage=data_element)
                 if data_element == 'train':
                     train_accuracy_list.append(accuracy)
                 else:
@@ -277,8 +284,14 @@ def evaluate_model(model, device, test_loaders, outer_fold_id, inner_fold_id, ma
             outputs = model(sample)
             _, predicted = torch.max(outputs.data, 1)
 
-            ground_array.append(ground.item())
-            prediction_array.append(predicted.item())
+            if stage == 'test':
+                ground_array.append(ground.item())
+                prediction_array.append(predicted.item())
+            else:
+                assert len(ground) == len(predicted)
+                for n in range(len(ground)):
+                    ground_array.append(ground[n].item())
+                    prediction_array.append(predicted[n].item())
 
             total += ground.size(0)
             correct += (predicted == ground).sum().item()

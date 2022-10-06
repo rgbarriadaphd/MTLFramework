@@ -13,6 +13,8 @@ from string import Template
 import json
 import torch
 import logging
+from PIL import Image
+import hashlib
 
 from constants.train_constants import *
 from constants.path_constants import *
@@ -35,7 +37,8 @@ class TrainMTLModel:
         self._folds_performance = []
         self._folds_acc = []
         self._global_performance = {}
-
+        self._dataset_history = {}
+        self._model_history = {}
         self._create_train_folder()
         self._generate_summary_template()
         self._init_device()
@@ -96,7 +99,8 @@ class TrainMTLModel:
         Gathers model architecture
         :return:
         """
-        self._model = DLModel(device=self._device).get()
+        self._model_obj = DLModel(device=self._device)
+        self._model = self._model_obj.get()
         self._model.to(device=self._device)
 
     def _generate_summary_template(self):
@@ -137,7 +141,7 @@ class TrainMTLModel:
         # Global Configuration
         summary_template_values = {
             'datetime': datetime.now(),
-            'model': "MTL",
+            'model': [dt for dt in DATASETS],
             'normalized': CUSTOM_NORMALIZED,
             'save_model': SAVE_MODEL,
             'plot_loss': SAVE_LOSS_PLOT,
@@ -217,8 +221,8 @@ class TrainMTLModel:
         if CONTROL_TRAIN:
             l_param = ["python plot/loss_plot.py", f'"Train progress(fold {inner_fold_id})"',
                        '"epochs, accuracy"', '"train, test"',
-                       f'{os.path.join(self._csv_folder, "accuracy_on_train" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")},{os.path.join(self._csv_folder, "accuracy_on_test.csv")}',
-                       f'{os.path.join(self._plot_folder, "accuracy" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
+                       f'{os.path.join(self._train_folder, "accuracy_on_train_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")},{os.path.join(self._train_folder, "accuracy_on_test_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
+                       f'{os.path.join(self._train_folder, "accuracy_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
             os.system(' '.join(l_param))
 
     def _get_fold_perform_data(self, outer_fold_id, inner_fold_id, train_data_loaders, test_data_loaders, tf_fold_train,
@@ -239,6 +243,113 @@ class TrainMTLModel:
             f'fold_train_time_{outer_fold_id}_{inner_fold_id}': f'{tf_fold_train:.{ND}f}',
             f'fold_test_time_{outer_fold_id}_{inner_fold_id}': f'{tf_fold_test:.{ND}f}',
         }
+
+    def _model_health_checks(self):
+        """
+        Validates the mdoel evolution on each iteration
+        """
+        pres = []
+        post = []
+        for i in range(1, N_INCREASED_FOLDS + 1):
+            for j in range(1, 6):
+                pres.append(self._model_history[(i, j)]['pre-train'])
+                post.append(self._model_history[(i, j)]['post-train'])
+
+        # All models starts
+        print(self._model_history)
+        assert len(list(set(pres))) == 1
+        assert (len(list(set(post))) == N_INCREASED_FOLDS * 5) and (pres[0] != post[0])
+
+    def _folds_health_checks(self):
+        """
+        Validates the transition of test/train data over folds
+        """
+        n_outer = N_INCREASED_FOLDS
+        expected_train_appearances = n_outer * 4
+        expected_test_appearances = n_outer * 1
+        assert (expected_train_appearances + expected_test_appearances) == 5 * n_outer
+        for image_data in self._dataset_history:
+            image_name = image_data
+            image_labels = self._dataset_history[image_data]['label']
+            uses_train = self._dataset_history[image_data]['train']
+            uses_test = self._dataset_history[image_data]['test']
+            # Check completeness and coherence
+            sum_cases = uses_train + uses_test
+            assert len(sum_cases) == 5 * n_outer
+            for i in range(1, N_INCREASED_FOLDS + 1):
+                for j in range(1, 6):
+                    assert (i, j) in sum_cases
+            # check lengths
+            assert len(image_labels) == len(uses_train) + len(uses_test)
+            assert len(uses_train) + len(uses_test) == 5 * n_outer
+            # only one value 1/0 acceptable as label
+            assert len(set(image_labels)) == 1
+            # expected appearances of the image in the train set
+            assert len(set(uses_train)) == expected_train_appearances
+            # expected appearances of the image in the test set
+            assert len(set(uses_test)) == expected_test_appearances
+
+    def check_hash_dynamic_run(self):
+        train_images_list = []
+        train_hash_list = []
+        for root, dirs, files in os.walk(os.path.join(DYNAMIC_RUN_FOLDER, 'train')):
+            for image_name in files:
+                assert os.path.exists(os.path.join(root, image_name))
+                image_path = os.path.join(root, image_name)
+                pil_image = Image.open(image_path)
+                md5hash = hashlib.md5(pil_image.tobytes())
+                train_images_list.append(image_path)
+                train_hash_list.append(md5hash.hexdigest())
+        assert len(train_images_list) == len(train_hash_list)
+        assert len(train_hash_list) == len(set(train_hash_list))
+
+        test_images_list = []
+        test_hash_list = []
+        for root, dirs, files in os.walk(os.path.join(DYNAMIC_RUN_FOLDER, 'test')):
+            for image_name in files:
+                assert os.path.exists(os.path.join(root, image_name))
+                image_path = os.path.join(root, image_name)
+                pil_image = Image.open(image_path)
+                md5hash = hashlib.md5(pil_image.tobytes())
+                test_images_list.append(image_path)
+                test_hash_list.append(md5hash.hexdigest())
+        assert len(test_images_list) == len(test_hash_list)
+        assert len(test_hash_list) == len(set(test_hash_list))
+
+        intersection = list(set(train_hash_list) & set(test_hash_list))
+        assert len(intersection) == 0
+
+        print(f'Dynamic Run folder OK!! --> {DYNAMIC_RUN_FOLDER}')
+
+    def _update_dataset_history(self, train_data, test_data, outer_fold_id, inner_fold_id):
+        """
+        Updates dataset history
+        :param train_data:
+        :param test_data:
+        :param outer_fold_id:
+        :param inner_fold_id:
+        :return:
+        """
+        for label in train_data:
+            for image in train_data[label]:
+                if image not in self._dataset_history:
+                    self._dataset_history[image] = {}
+                    self._dataset_history[image]['train'] = [(outer_fold_id, inner_fold_id)]
+                    self._dataset_history[image]['test'] = []
+                    self._dataset_history[image]['label'] = [0 if label == 'CEN' else 1]
+                    continue
+                self._dataset_history[image]['train'].append((outer_fold_id, inner_fold_id))
+                self._dataset_history[image]['label'].append(0 if label == 'CEN' else 1)
+        for label in test_data:
+            for image in test_data[label]:
+                if image not in self._dataset_history:
+                    self._dataset_history[image] = {}
+                    self._dataset_history[image]['train'] = []
+                    self._dataset_history[image]['test'] = [(outer_fold_id, inner_fold_id)]
+                    self._dataset_history[image]['label'] = [0 if label == 'CEN' else 1]
+                    continue
+                self._dataset_history[image]['test'].append((outer_fold_id, inner_fold_id))
+                self._dataset_history[image]['label'].append(0 if label == 'CEN' else 1)
 
     def _compute_cross_validation_performance(self, folds_acc):
         """
@@ -273,13 +384,17 @@ class TrainMTLModel:
                     f'***************************** Fold ID: {outer_fold_id} - {inner_fold_id} *****************************')
                 # Generate fold data
                 t0 = time.time()
-                self._fold_handler.generate_run_set(inner_fold_id)
+                fold_train_data, fold_test_data = self._fold_handler.generate_run_set(inner_fold_id)
                 print(f'Generate run set: {time.time() - t0}s')
+                self._check_hash_dynamic_run()
+                self._update_dataset_history(fold_train_data, fold_test_data, outer_fold_id, inner_fold_id)
 
                 # Init model
                 t0 = time.time()
                 self._init_model()
                 print(f'Init the model: {time.time() - t0}s')
+                self._model_history[(outer_fold_id, inner_fold_id)] = {'pre-train': self._model_obj.get_control_model(),
+                                                                       'post-train': None}
 
                 # Get dataset normalization mean and std
                 t0 = time.time()
@@ -297,10 +412,12 @@ class TrainMTLModel:
                 t0_fold_train = time.time()
                 self._model, train_data = train_model(model=self._model,
                                                       device=self._device,
+                                                      mean=self._normalization[0],
+                                                      std=self._normalization[1],
                                                       train_loaders=train_data_loaders
                                                       )
                 tf_fold_train = time.time() - t0_fold_train
-
+                self._model_history[(outer_fold_id, inner_fold_id)]['post-train'] = self._model_obj.get_control_model()
                 self._save_csv_data(train_data, outer_fold_id, inner_fold_id)
 
                 # Test MTL model.
@@ -317,7 +434,7 @@ class TrainMTLModel:
                                                                  outer_fold_id=outer_fold_id,
                                                                  inner_fold_id=inner_fold_id)
                 tf_fold_test = time.time() - t0_fold_test
-
+                print(f'Fold accuracy on test dataset: {fold_accuracy}')
                 self._folds_acc.append(fold_accuracy)
 
                 fold_data = self._get_fold_perform_data(outer_fold_id, inner_fold_id, train_data_loaders,
@@ -333,6 +450,10 @@ class TrainMTLModel:
 
                 # Plot loss curves
                 self._plot_loss_curves(outer_fold_id, inner_fold_id)
+
+        # Check model consistency
+        self._folds_health_checks()
+        self._model_health_checks()
 
         # Compute global performance
         self._global_performance = self._compute_cross_validation_performance()
