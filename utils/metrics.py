@@ -10,6 +10,8 @@ import logging
 import random
 import statistics
 import math
+from sklearn.metrics import roc_curve, auc
+import numpy as np
 
 ND = 2
 
@@ -114,6 +116,9 @@ class PerformanceMetrics:
         self._precision = None
         self._recall = None
         self._f1 = None
+        self._fpr = dict()
+        self._tpr = dict()
+        self._roc_auc = dict()
         self._compute_measures()
 
     def _compute_measures(self):
@@ -125,6 +130,25 @@ class PerformanceMetrics:
         self._compute_precision()
         self._compute_recall()
         self._compute_f1()
+        self._compute_roc_params()
+
+    def _compute_roc_params(self):
+        """
+        Computes ROC AUC parameters
+        """
+        ground = np.array(self._ground)
+        prediction = np.array(self._prediction)
+        for i in range(2):
+            self._fpr[i], self._tpr[i], _ = roc_curve(ground, prediction)
+            self._roc_auc[i] = auc(self._fpr[i], self._tpr[i])
+            self._fpr[i] = list(self._fpr[i])
+            self._tpr[i] = list(self._tpr[i])
+
+        # Compute micro-average ROC curve and ROC area
+        self._fpr["micro"], self._tpr["micro"], _ = roc_curve(ground.ravel(), prediction.ravel())
+        self._roc_auc["micro"] = auc(self._fpr["micro"], self._tpr["micro"])
+        self._fpr["micro"] = list(self._fpr["micro"])
+        self._tpr["micro"] = list(self._tpr["micro"])
 
     def _compute_confusion_matrix(self):
         """
@@ -235,6 +259,24 @@ class PerformanceMetrics:
         else:
             return f1
 
+    def fpr(self):
+        """
+        :return: False positive rate for ROC
+        """
+        return self._fpr
+
+    def tpr(self):
+        """
+        :return: True positive rate for ROC
+        """
+        return self._tpr
+
+    def roc_auc(self):
+        """
+        :return:ROC AUC
+        """
+        return self._roc_auc
+
 
 def global_results(measures):
     cvm = CrossValidationMeasures(measures, percent=True, formatted=True)
@@ -271,6 +313,7 @@ def global_results(measures):
     print("\end{tabular}")
     print("\label{tab:metrics}")
     print("\end{table}")
+
 
 def by_outer_fold_results(measures):
     print('\\begin{table}[H]')
@@ -322,6 +365,7 @@ def comparison_global(measures_a, measures_b):
     print('\end{tabular}')
     print('\end{table}')
 
+
 def comparison_by_outer_fold_results(measures_a, measures_b):
     """
 
@@ -371,9 +415,9 @@ def comparison_by_outer_fold_results(measures_a, measures_b):
             acc_a.append(a)
             acc_b.append(b)
 
-
     print('\end{tabular}')
     print('\end{table}')
+
 
 if __name__ == '__main__':
     # # Test functions
@@ -404,22 +448,28 @@ if __name__ == '__main__':
     # print(f'Std Dev: {cvm.stddev()}')
     # print(f'Interval: {}')
 
-    mtl_measures = [random.uniform(0, 1) for i in range(50)]
-    cac_measures = [random.uniform(0, 1) for i in range(50)]
+    # mtl_measures = [random.uniform(0, 1) for i in range(50)]
+    # cac_measures = [random.uniform(0, 1) for i in range(50)]
 
-    print('\section{10-5 Cross Validation}')
-    print('\subsection{MTL}')
-    print('\subsubsection{Global Results}')
-    global_results(mtl_measures)
-    print('\subsubsection{By outer fold}')
-    by_outer_fold_results(mtl_measures)
-    print('\subsection{CAC}')
-    print('\subsubsection{Global Results}')
-    global_results(cac_measures)
-    print('\subsubsection{By outer fold}')
-    by_outer_fold_results(cac_measures)
-    print('\subsection{Comparison MTL vs. CAC}')
-    print('\subsubsection{Global Results}')
-    comparison_global(mtl_measures, cac_measures)
-    print('\subsubsection{By outer fold}')
-    comparison_by_outer_fold_results(mtl_measures, cac_measures)
+    # print('\section{10-5 Cross Validation}')
+    # print('\subsection{MTL}')
+    # print('\subsubsection{Global Results}')
+    # global_results(mtl_measures)
+    # print('\subsubsection{By outer fold}')
+    # by_outer_fold_results(mtl_measures)
+    # print('\subsection{CAC}')
+    # print('\subsubsection{Global Results}')
+    # global_results(cac_measures)
+    # print('\subsubsection{By outer fold}')
+    # by_outer_fold_results(cac_measures)
+    # print('\subsection{Comparison MTL vs. CAC}')
+    # print('\subsubsection{Global Results}')
+    # comparison_global(mtl_measures, cac_measures)
+    # print('\subsubsection{By outer fold}')
+    # comparison_by_outer_fold_results(mtl_measures, cac_measures)
+
+
+    mground = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    mprediction = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1]
+    pm = PerformanceMetrics(mground, mprediction, percent=True, formatted=True)
+    a = 6

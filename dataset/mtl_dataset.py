@@ -89,31 +89,5 @@ def load_and_transform_data(stage, shuffle=False, mean=None, std=None):
     return dataset_loaders
 
 
-def concat_datasets(batch_dataset_1, batch_dataset_2):
-    # Concatenate both datasets
-    concat_image = torch.cat((batch_dataset_1[0], batch_dataset_2[0]), 0)
-    concat_label = torch.cat((batch_dataset_1[1], batch_dataset_2[1]), 0)
-    concat_index = torch.cat((batch_dataset_1[2], batch_dataset_2[2]), 0)
-    concat_dt_name = batch_dataset_1[3] + batch_dataset_2[3]
-
-    before_shuffle_index = [concat_index[elem] for elem in range(len(concat_index))]
-
-    # Shuffle data
-    selection = list(range(len(concat_dt_name)))
-    random.shuffle(selection)
-
-    concat_image = concat_image[selection]
-    concat_label = concat_label[selection]
-    concat_index = concat_index[selection]
-    concat_dt_name = list(concat_dt_name)
-    concat_dt_name = [concat_dt_name[elem] for elem in selection]
-
-    # Check shuffle
-    after_shuffle_index = [concat_index[selection.index(elem)] for elem in range(len(concat_index))]
-    assert before_shuffle_index == after_shuffle_index
-
-    return concat_image, concat_label, concat_index, concat_dt_name
-
-
 if __name__ == '__main__':
     data_loaders = load_and_transform_data(stage='train', shuffle=True)

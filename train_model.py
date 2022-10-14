@@ -83,16 +83,20 @@ class TrainMTLModel:
         :param inner_fold_id: (int) inner folder id
         :return: ((list) mean, (list) std) Normalized mean and std according to train dataset
         """
+        if len(DATASETS) == 1:
+            dataset_name = list(DATASETS.keys())[0]
+
         # Generate custom mean and std normalization values from only train dataset
-        if not CUSTOM_NORMALIZED or not os.path.exists(CAC_NORMALIZATION):
+        if not CUSTOM_NORMALIZED or not os.path.exists(DATASETS[dataset_name]['normalization_path']):
             self._normalization = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             return
 
         # Retrieve normalization file
-        with open(CAC_NORMALIZATION) as f:
+        with open(DATASETS[dataset_name]['normalization_path']) as f:
             normalization_data = json.load(f)
-        self._normalization = (normalization_data[outer_fold_id][inner_fold_id]['mean'],
-                               normalization_data[outer_fold_id][inner_fold_id]['std'])
+        print("Custom Normalization!")
+        self._normalization = (normalization_data[str(outer_fold_id)][str(inner_fold_id)]['mean'],
+                               normalization_data[str(outer_fold_id)][str(inner_fold_id)]['std'])
 
     def _init_model(self):
         """
@@ -206,6 +210,22 @@ class TrainMTLModel:
                 writer = csv.writer(f, delimiter=',')
                 writer.writerows([data])
 
+    def _save_roc_data(self, outer_fold_id, inner_fold_id, fpr, tpr, roc_auc):
+        """
+        :param outer_fold_id: (int) outer fold identifier
+        :param inner_fold_id: (int) inner fold identifier
+        :param fpr: (dict) false positives ratio dictionary
+        :param tpr: (dict) true positives ratio dictionary
+        :param roc_auc: (dict) roc auc data
+        """
+        roc_data = {'fpr': fpr,
+                    'tpr': tpr,
+                    'roc_auc': roc_auc}
+        json_file = os.path.join(self._csv_folder, f'roc_{outer_fold_id}_{inner_fold_id}.json')
+
+        with open(json_file, 'w') as f:
+            json.dump(roc_data, f)
+
     def _plot_loss_curves(self, outer_fold_id, inner_fold_id):
         """
         Plot losses
@@ -221,9 +241,21 @@ class TrainMTLModel:
         if CONTROL_TRAIN:
             l_param = ["python plot/loss_plot.py", f'"Train progress(fold {inner_fold_id})"',
                        '"epochs, accuracy"', '"train, test"',
-                       f'{os.path.join(self._train_folder, "accuracy_on_train_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")},{os.path.join(self._train_folder, "accuracy_on_test_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
-                       f'{os.path.join(self._train_folder, "accuracy_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
+                       f'{os.path.join(self._csv_folder, "accuracy_on_train_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")},{os.path.join(self._csv_folder, "accuracy_on_test_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
+                       f'{os.path.join(self._plot_folder, "accuracy_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
             os.system(' '.join(l_param))
+
+    def _plot_roc_curves(self, outer_fold_id, inner_fold_id):
+        """
+        Plot losses
+        """
+        json_file = os.path.join(self._csv_folder, f'roc_{outer_fold_id}_{inner_fold_id}.json')
+        l_param = ["python plot/roc_plot.py", f'"ROC (fold {outer_fold_id}-{inner_fold_id})"',
+                   '"False Positive Rate, True Positive Rate"', '"ROC curve (area = {{}})"',
+                   json_file,
+                   f'{os.path.join(self._plot_folder, "roc_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
+        call = ' '.join(l_param)
+        os.system(call)
 
     def _get_fold_perform_data(self, outer_fold_id, inner_fold_id, train_data_loaders, test_data_loaders, tf_fold_train,
                                tf_fold_test):
@@ -250,7 +282,7 @@ class TrainMTLModel:
         """
         pres = []
         post = []
-        for i in range(1, N_INCREASED_FOLDS + 1):
+        for i in range(N_INCREASED_FOLDS[0], N_INCREASED_FOLDS[1] + 1):
             for j in range(1, 6):
                 pres.append(self._model_history[(i, j)]['pre-train'])
                 post.append(self._model_history[(i, j)]['post-train'])
@@ -258,13 +290,15 @@ class TrainMTLModel:
         # All models starts
         print(self._model_history)
         assert len(list(set(pres))) == 1
-        assert (len(list(set(post))) == N_INCREASED_FOLDS * 5) and (pres[0] != post[0])
+        n_outer = N_INCREASED_FOLDS[1] + 1 - N_INCREASED_FOLDS[0]
+        assert (len(list(set(post))) == n_outer * 5) and (pres[0] != post[0])
 
     def _folds_health_checks(self):
         """
         Validates the transition of test/train data over folds
         """
-        n_outer = N_INCREASED_FOLDS
+        n_outer = N_INCREASED_FOLDS[1] + 1 - N_INCREASED_FOLDS[0]
+        print(f'n_outer ---> {n_outer}')
         expected_train_appearances = n_outer * 4
         expected_test_appearances = n_outer * 1
         assert (expected_train_appearances + expected_test_appearances) == 5 * n_outer
@@ -276,20 +310,20 @@ class TrainMTLModel:
             # Check completeness and coherence
             sum_cases = uses_train + uses_test
             assert len(sum_cases) == 5 * n_outer
-            for i in range(1, N_INCREASED_FOLDS + 1):
+            for i in range(N_INCREASED_FOLDS[0], N_INCREASED_FOLDS[1] + 1):
                 for j in range(1, 6):
                     assert (i, j) in sum_cases
             # check lengths
-            assert len(image_labels) == len(uses_train) + len(uses_test)
-            assert len(uses_train) + len(uses_test) == 5 * n_outer
+            assert len(image_labels) == len(uses_train) + len(uses_test), f'{len(image_labels)}| {len(uses_train)}|{len(uses_test)}'
+            assert len(uses_train) + len(uses_test) == 5 * n_outer, f'{len(uses_train)}| {len(uses_test)}|{n_outer}'
             # only one value 1/0 acceptable as label
-            assert len(set(image_labels)) == 1
+            assert len(set(image_labels)) == 1, f'{len(set(image_labels))}'
             # expected appearances of the image in the train set
-            assert len(set(uses_train)) == expected_train_appearances
+            assert len(set(uses_train)) == expected_train_appearances, f'{len(set(uses_train))}| {expected_train_appearances}'
             # expected appearances of the image in the test set
-            assert len(set(uses_test)) == expected_test_appearances
+            assert len(set(uses_test)) == expected_test_appearances, f'{len(set(uses_test))}| {expected_test_appearances}'
 
-    def check_hash_dynamic_run(self):
+    def _check_hash_dynamic_run(self):
         train_images_list = []
         train_hash_list = []
         for root, dirs, files in os.walk(os.path.join(DYNAMIC_RUN_FOLDER, 'train')):
@@ -351,7 +385,7 @@ class TrainMTLModel:
                 self._dataset_history[image]['test'].append((outer_fold_id, inner_fold_id))
                 self._dataset_history[image]['label'].append(0 if label == 'CEN' else 1)
 
-    def _compute_cross_validation_performance(self, folds_acc):
+    def _compute_cross_validation_performance(self):
         """
         Computes cross validation metrics and returns in
         """
@@ -398,7 +432,7 @@ class TrainMTLModel:
 
                 # Get dataset normalization mean and std
                 t0 = time.time()
-                self._get_normalization()
+                self._get_normalization(outer_fold_id, inner_fold_id)
                 print(f'Normalization: {time.time() - t0}s')
 
                 # Train MTL model.
@@ -437,6 +471,12 @@ class TrainMTLModel:
                 print(f'Fold accuracy on test dataset: {fold_accuracy}')
                 self._folds_acc.append(fold_accuracy)
 
+                self._save_roc_data(outer_fold_id, inner_fold_id,
+                                    fold_performance[f'fpr_{outer_fold_id}_{inner_fold_id}'],
+                                    fold_performance[f'tpr_{outer_fold_id}_{inner_fold_id}'],
+                                    fold_performance[f'roc_auc_{outer_fold_id}_{inner_fold_id}']
+                                    )
+
                 fold_data = self._get_fold_perform_data(outer_fold_id, inner_fold_id, train_data_loaders,
                                                         test_data_loaders, tf_fold_train,
                                                         tf_fold_test)
@@ -450,6 +490,16 @@ class TrainMTLModel:
 
                 # Plot loss curves
                 self._plot_loss_curves(outer_fold_id, inner_fold_id)
+
+                # Plot ROC curves
+                self._plot_roc_curves(outer_fold_id, inner_fold_id)
+
+                # Run only one fold
+                if MONO_FOLD:
+                    logging.info("Only one fold is executed")
+                    break
+            if MONO_FOLD:
+                break
 
         # Check model consistency
         self._folds_health_checks()

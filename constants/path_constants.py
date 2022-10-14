@@ -24,17 +24,23 @@ assert os.path.exists(TRAIN_FOLDER)
 
 CAC_DATASET_FOLDER = os.path.join(INPUT_FOLDER, 'CAC')
 assert os.path.exists(CAC_DATASET_FOLDER)
+
 DR_DATASET_FOLDER = os.path.join(INPUT_FOLDER, 'DR')
 assert os.path.exists(DR_DATASET_FOLDER)
 
-DYNAMIC_RUN_FOLDER = os.path.join(CAC_DATASET_FOLDER, 'dynamic_run')
+CE_DATASET_FOLDER = os.path.join(INPUT_FOLDER, 'CE')
+assert os.path.exists(CE_DATASET_FOLDER)
+
+DYNAMIC_RUN_FOLDER = os.path.join(CE_DATASET_FOLDER, 'dynamic_run')
 assert os.path.exists(DYNAMIC_RUN_FOLDER)
 
-ROOT_ORIGINAL_FOLDS = os.path.join(CAC_DATASET_FOLDER, 'outer_folds')
+ROOT_ORIGINAL_FOLDS = os.path.join(CE_DATASET_FOLDER, 'outer_folds')
 assert os.path.exists(ROOT_ORIGINAL_FOLDS)
 
 CAC_NEGATIVE = 'CACSmenos400'
 CAC_POSITIVE = 'CACSmas400'
+CEP = 'CEP'
+CEN = 'CEN'
 TRAIN = 'train'
 TEST = 'test'
 
@@ -53,3 +59,4 @@ FOLD_FOLDER = 'folds'
 # Normalization files
 # =======================
 CAC_NORMALIZATION = os.path.join(CAC_DATASET_FOLDER, 'normalization.json')
+CE_NORMALIZATION = os.path.join(CE_DATASET_FOLDER, 'normalization.json')

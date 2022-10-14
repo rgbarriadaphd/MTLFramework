@@ -1,7 +1,7 @@
 """
 # Author: ruben 
 # Date: 27/1/22
-# Project: CACFramework
+# Project: MTLFramework
 # File: fold_handler.py
 
 Description: Class to manage the change of test and train data when iteration over the input samples
@@ -9,8 +9,8 @@ Description: Class to manage the change of test and train data when iteration ov
 import logging
 import os
 import shutil
+from constants.path_constants import CEP, CEN
 from distutils.dir_util import copy_tree
-from constants.path_constants import CAC_NEGATIVE, CAC_POSITIVE
 
 FOLD_ID = 'inner_fold_'
 
@@ -59,47 +59,50 @@ class FoldHandler:
                 for label_ts in test_set:
                     assert image_tr not in test_set[label_ts]
 
+
+
+
     def generate_run_set(self, test_fold_id=1):
         """
         Organize folds split in train and test folds
         :param test_fold_id: Fold identifier that will be used for testing
         """
-
-        test_set = {CAC_POSITIVE: [], CAC_NEGATIVE: []}
-        train_set = {CAC_POSITIVE: [], CAC_NEGATIVE: []}
+        test_set = {CEP: [], CEN: []}
+        train_set = {CEP: [], CEN: []}
         if os.path.isdir(self._run_base):
             shutil.rmtree(self._run_base)
         os.mkdir(self._run_base)
         os.mkdir(os.path.join(self._run_base, 'train'))
-        os.mkdir(os.path.join(self._run_base, 'train', CAC_POSITIVE))
-        os.mkdir(os.path.join(self._run_base, 'train', CAC_NEGATIVE))
+        os.mkdir(os.path.join(self._run_base, 'train', CEP))
+        os.mkdir(os.path.join(self._run_base, 'train', CEN))
         os.mkdir(os.path.join(self._run_base, 'test'))
-        os.mkdir(os.path.join(self._run_base, 'test', CAC_POSITIVE))
-        os.mkdir(os.path.join(self._run_base, 'test', CAC_NEGATIVE))
+        os.mkdir(os.path.join(self._run_base, 'test', CEP))
+        os.mkdir(os.path.join(self._run_base, 'test', CEN))
 
         train_folds_mas = []
         train_folds_menos = []
-
         for fold_id in range(0, self._nfolds):
-            org_mas = os.path.join(self._fold_base, FOLD_ID + str(fold_id + 1), CAC_POSITIVE)
-            org_menos = os.path.join(self._fold_base, FOLD_ID + str(fold_id + 1), CAC_NEGATIVE)
+            org_mas = os.path.join(self._fold_base, FOLD_ID + str(fold_id + 1), CEP)
+            org_menos = os.path.join(self._fold_base, FOLD_ID + str(fold_id + 1), CEN)
             if (fold_id + 1) == test_fold_id:
-                test_set[CAC_POSITIVE] = [item.split('.')[0] for item in os.listdir(org_mas)]
-                test_set[CAC_NEGATIVE] = [item.split('.')[0] for item in os.listdir(org_menos)]
+                test_set[CEP] = [item.split('.')[0] for item in os.listdir(org_mas)]
+                test_set[CEN] = [item.split('.')[0] for item in os.listdir(org_menos)]
                 # Copy test fold
-                dst_mas = os.path.join(self._run_base, 'test', CAC_POSITIVE)
-                dst_menos = os.path.join(self._run_base, 'test', CAC_NEGATIVE)
+                dst_mas = os.path.join(self._run_base, 'test', CEP)
+                dst_menos = os.path.join(self._run_base, 'test', CEN)
             else:
                 train_folds_mas.append(os.listdir(org_mas))
                 train_folds_menos.append(os.listdir(org_menos))
                 # Rest of train folds
-                dst_mas = os.path.join(self._run_base, 'train', CAC_POSITIVE)
-                dst_menos = os.path.join(self._run_base, 'train', CAC_NEGATIVE)
+                dst_mas = os.path.join(self._run_base, 'train', CEP)
+                dst_menos = os.path.join(self._run_base, 'train', CEN)
+
             copy_tree(org_mas, dst_mas)
             copy_tree(org_menos, dst_menos)
 
-        train_set[CAC_POSITIVE] = [item.split('.')[0] for sublist in train_folds_mas for item in sublist]
-        train_set[CAC_NEGATIVE] = [item.split('.')[0] for sublist in train_folds_menos for item in sublist]
+        train_set[CEP] = [item.split('.')[0] for sublist in train_folds_mas for item in sublist]
+        train_set[CEN] = [item.split('.')[0] for sublist in train_folds_menos for item in sublist]
 
         self._check_sets(train_set, test_set)
         return train_set, test_set
+

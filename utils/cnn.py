@@ -23,10 +23,6 @@ from dataset.mtl_dataset import load_and_transform_data
 from utils.metrics import PerformanceMetrics
 
 
-def main():
-    print("run")
-
-
 class DLModel:
     """
     Class to manage the architecture initialization
@@ -146,6 +142,67 @@ def concat_datasets(batch_dataset_1, batch_dataset_2):
     return concat_image, concat_label, concat_index, concat_dt_name
 
 
+def print_model(model):
+    logging.info("=================================================")
+    for layer, param in enumerate(model.features.parameters()):
+        logging.info(f'{layer}, {param.requires_grad}')
+
+    for layer, param in enumerate(model.classifier.parameters()):
+        logging.info(f'{layer}, {param.requires_grad}')
+    logging.info("=================================================")
+
+
+def update_dynamic_freeze_model(model, df_changed, epoch, print_net=True):
+    '''
+    40% epochs only classifier. (by default)
+    10% epochs only 0-10 layers
+    10% epochs only 10-20 layers
+    10% epochs only 20-29 10 layers
+    30% epochs only classifier
+    '''
+    if 400 <= epoch <= 500:
+        if not df_changed[0]:
+            df_changed[0] = True
+            for pos, param in enumerate(model.features.parameters()):
+                if 0 <= pos <= 7:
+                    param.requires_grad = True
+            for param in model.classifier.parameters():
+                param.requires_grad = False
+            if print_net:
+                print_model(model)
+
+    if 500 <= epoch <= 600:
+        if not df_changed[1]:
+            df_changed[1] = True
+            for pos, param in enumerate(model.features.parameters()):
+                if 0 <= pos <= 7:
+                    param.requires_grad = False
+                if 8 <= pos <= 19:
+                    param.requires_grad = True
+            if print_net:
+                print_model(model)
+
+    if 600 <= epoch <= 700:
+        if not df_changed[2]:
+            df_changed[2] = True
+            for pos, param in enumerate(model.features.parameters()):
+                if 8 <= pos <= 19:
+                    param.requires_grad = False
+                if 20 <= pos <= 25:
+                    param.requires_grad = True
+            if print_net:
+                print_model(model)
+    if epoch >= 700:
+        if not df_changed[3]:
+            df_changed[3] = True
+            for param in model.features.parameters():
+                param.requires_grad = False
+            for param in model.classifier.parameters():
+                param.requires_grad = True
+            if print_net:
+                print_model(model)
+
+
 def train_model(model, device, train_loaders, mean=None, std=None):
     """
     Trains the model with input parametrization
@@ -176,11 +233,18 @@ def train_model(model, device, train_loaders, mean=None, std=None):
     elif CRITERION == 'MTLRetinalSelectorLoss':
         criterion = MTLRetinalSelectorLoss()
 
+    if DYNAMIC_FREEZE:
+        df_changed = [False, False, False, False]
+
     inf_condition = False
     for epoch in range(EPOCHS):
         if inf_condition:
-            logging.info(f'outter INF condition at epoch {epoch + 1}')
+            logging.info(f'outer INF condition at epoch {epoch + 1}')
             break
+
+        if DYNAMIC_FREEZE:
+            update_dynamic_freeze_model(model, df_changed, epoch)
+
         model.train(True)
         running_loss = 0.0
         print(f'------------- EPOCH: {epoch + 1} -------------')
@@ -222,8 +286,6 @@ def train_model(model, device, train_loaders, mean=None, std=None):
                 if math.isinf(loss.item()):
                     inf_condition = True
                     break
-
-
 
         epoch_loss = running_loss / n_train
         print(f'EPOCH Loss : {epoch_loss}')
@@ -316,9 +378,16 @@ def evaluate_model(model, device, test_loaders, outer_fold_id, inner_fold_id, ma
         f'tn_{outer_fold_id}_{inner_fold_id}': confusion_matrix[0],
         f'fp_{outer_fold_id}_{inner_fold_id}': confusion_matrix[1],
         f'fn_{outer_fold_id}_{inner_fold_id}': confusion_matrix[2],
-        f'tp_{outer_fold_id}_{inner_fold_id}': confusion_matrix[3]
+        f'tp_{outer_fold_id}_{inner_fold_id}': confusion_matrix[3],
+        f'fpr_{outer_fold_id}_{inner_fold_id}': pm.fpr(),
+        f'tpr_{outer_fold_id}_{inner_fold_id}': pm.tpr(),
+        f'roc_auc_{outer_fold_id}_{inner_fold_id}': pm.roc_auc()
     }
     return performance, accuracy
+
+
+def main():
+    pass
 
 
 if __name__ == '__main__':
