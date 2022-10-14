@@ -19,7 +19,6 @@ def get_custom_normalization(target):
     :return: ((list) mean, (list) std) Normalization values mean and std
     """
 
-
     means = []
     stds = []
 

@@ -8,8 +8,12 @@ Global Configuration:
 Architecture: $model
 Normalized: $normalized
 Save model: $save_model
+Save accuracy: $save_accuracy
+Control train/test: $control_train
 Plot Loss: $plot_loss
+Plot ROC: $plot_roc
 Device: $device
+Dynamic freeze : $dynamic_freeze
 Cross validation: ($outer_min, $outer_max)-5 fold validation
 Require Grad: $require_grad
 Weights Init.: $weight_init
@@ -20,6 +24,14 @@ Hyperparams:
 	Weight Decay: $weight_decay
 	Criterion: $criterion
 	Optimizer: $optimizer
+
+
+
+
+
+
+
+
 
 
 =================================

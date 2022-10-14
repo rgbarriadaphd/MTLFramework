@@ -51,6 +51,7 @@ CONTROL_TRAIN = False  # Runs model on train/test every epoch
 MONO_FOLD = False  # Run only first Fold (for test)
 SAVE_MODEL = False  # True if model has to be saved
 SAVE_LOSS_PLOT = True  # True if loss plot has to be saved
+SAVE_ROC_PLOT = True  # True if loss plot has to be saved
 SAVE_ACCURACY_PLOT = False  # True if accuracy plot has to be saved
 ND = 2  # Number of decimals at outputs
 

@@ -149,6 +149,9 @@ class TrainMTLModel:
             'normalized': CUSTOM_NORMALIZED,
             'save_model': SAVE_MODEL,
             'plot_loss': SAVE_LOSS_PLOT,
+            'save_accuracy': SAVE_ACCURACY_PLOT,
+            'control_train': CONTROL_TRAIN,
+            'plot_roc': SAVE_ROC_PLOT,
             'epochs': EPOCHS,
             'batch_size': [(dt, DATASETS[dt]['batch_size']) for dt, values in DATASETS.items()],
             'learning_rate': LEARNING_RATE,
@@ -159,7 +162,8 @@ class TrainMTLModel:
             'require_grad': REQUIRES_GRAD,
             'weight_init': WEIGHT_INIT,
             'outer_min': N_INCREASED_FOLDS[0],
-            'outer_max': N_INCREASED_FOLDS[1]
+            'outer_max': N_INCREASED_FOLDS[1],
+            'dynamic_freeze': DYNAMIC_FREEZE,
         }
 
         if unique_fold_performance:
@@ -230,6 +234,8 @@ class TrainMTLModel:
         """
         Plot losses
         """
+        if not SAVE_LOSS_PLOT:
+            return
         l_param = ["python plot/loss_plot.py", f'"Loss evolution (fold {outer_fold_id}-{inner_fold_id})"',
                    '"epochs, loss"', '"CAC loss"',
                    f'{os.path.join(self._csv_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
@@ -249,6 +255,8 @@ class TrainMTLModel:
         """
         Plot losses
         """
+        if not SAVE_ROC_PLOT:
+            return
         json_file = os.path.join(self._csv_folder, f'roc_{outer_fold_id}_{inner_fold_id}.json')
         l_param = ["python plot/roc_plot.py", f'"ROC (fold {outer_fold_id}-{inner_fold_id})"',
                    '"False Positive Rate, True Positive Rate"', '"ROC curve (area = {{}})"',
