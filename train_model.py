@@ -73,7 +73,9 @@ class TrainMTLModel:
         Creates fold structure where train images will be split in 4 train folds + 1 test fold
         :param outer_fold_id: (int) Outer fold identifier
         """
-        self._fold_dataset = os.path.join(ROOT_ORIGINAL_FOLDS, 'outer_fold_{}'.format(outer_fold_id))
+        dataset_mode = ROOT_ORIGINAL_FOLDS_CLAHE if CLAHE else ROOT_ORIGINAL_FOLDS
+        print(f'Root of loaded folds: {dataset_mode}')
+        self._fold_dataset = os.path.join(dataset_mode, 'outer_fold_{}'.format(outer_fold_id))
         self._fold_handler = FoldHandler(self._fold_dataset, DYNAMIC_RUN_FOLDER)
 
     def _get_normalization(self, outer_fold_id, inner_fold_id):
@@ -94,7 +96,7 @@ class TrainMTLModel:
         # Retrieve normalization file
         with open(DATASETS[dataset_name]['normalization_path']) as f:
             normalization_data = json.load(f)
-        print("Custom Normalization!")
+        print(f'Custom Normalization! {DATASETS[dataset_name]["normalization_path"]}')
         self._normalization = (normalization_data[str(outer_fold_id)][str(inner_fold_id)]['mean'],
                                normalization_data[str(outer_fold_id)][str(inner_fold_id)]['std'])
 
@@ -237,7 +239,7 @@ class TrainMTLModel:
         if not SAVE_LOSS_PLOT:
             return
         l_param = ["python plot/loss_plot.py", f'"Loss evolution (fold {outer_fold_id}-{inner_fold_id})"',
-                   '"epochs, loss"', '"CAC loss"',
+                   '"epochs, loss"', f'"{list(DATASETS.keys())[0]} loss"',
                    f'{os.path.join(self._csv_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".csv")}',
                    f'{os.path.join(self._plot_folder, "loss_" + str(outer_fold_id) + "_" + str(inner_fold_id) + ".png")}']
 

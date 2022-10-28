@@ -7,6 +7,7 @@
 Description: Functions to provide performance metrics
 """
 import logging
+import os
 import random
 import statistics
 import math
@@ -469,7 +470,25 @@ if __name__ == '__main__':
     # comparison_by_outer_fold_results(mtl_measures, cac_measures)
 
 
-    mground = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    mprediction = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1]
-    pm = PerformanceMetrics(mground, mprediction, percent=True, formatted=True)
-    a = 6
+    # mground = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    # mprediction = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1]
+    # pm = PerformanceMetrics(mground, mprediction, percent=True, formatted=True)
+
+    #
+    # root = '/home/ruben/PycharmProjects/MTLFramework/output/train/train_20221014_083235/folds'
+    # measures = []
+    # for summary in os.listdir(root):
+    #     with open(os.path.join(root, summary)) as f:
+    #         lines = f.readlines()
+    #
+    #         for line in lines:
+    #             if 'Accuracy' in line:
+    #                 measures.append(float(line.split(':')[1].strip()))
+
+
+    measures = [64.61, 62.84, 65.78, 64.56, 66.21]
+    print(f'Measures: {str(measures)}')
+    cvm = CrossValidationMeasures(measures, percent=True, formatted=True)
+    print(f'Mean: {cvm.mean()}')
+    print(f'Std Dev: {cvm.stddev()}')
+    print(f'CI (95%): {cvm.interval()}')

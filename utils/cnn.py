@@ -51,6 +51,8 @@ class DLModel:
         for param in self._model.features.parameters():
             param.requires_grad = REQUIRES_GRAD
 
+        print_model(self._model)
+
     def get(self):
         """
         Return model
@@ -145,10 +147,10 @@ def concat_datasets(batch_dataset_1, batch_dataset_2):
 def print_model(model):
     logging.info("=================================================")
     for layer, param in enumerate(model.features.parameters()):
-        logging.info(f'{layer}, {param.requires_grad}')
+       print(f'{layer}, {param.requires_grad}')
 
     for layer, param in enumerate(model.classifier.parameters()):
-        logging.info(f'{layer}, {param.requires_grad}')
+        print(f'{layer}, {param.requires_grad}')
     logging.info("=================================================")
 
 
@@ -227,7 +229,11 @@ def train_model(model, device, train_loaders, mean=None, std=None):
     test_accuracy_list = []
     train_accuracy_list = []
 
-    optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    if OPTIMIZER == 'SDG':
+        optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    elif OPTIMIZER == 'ADAM':
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+
     if CRITERION == 'CrossEntropyLoss':
         criterion = nn.CrossEntropyLoss()
     elif CRITERION == 'MTLRetinalSelectorLoss':

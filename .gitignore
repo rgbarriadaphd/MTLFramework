@@ -131,3 +131,4 @@ dmypy.json
 .idea/
 input/
 output/
+fast_test.py

@@ -34,8 +34,11 @@ assert os.path.exists(CE_DATASET_FOLDER)
 DYNAMIC_RUN_FOLDER = os.path.join(CE_DATASET_FOLDER, 'dynamic_run')
 assert os.path.exists(DYNAMIC_RUN_FOLDER)
 
-ROOT_ORIGINAL_FOLDS = os.path.join(CE_DATASET_FOLDER, 'outer_folds')
+ROOT_ORIGINAL_FOLDS = os.path.join(CE_DATASET_FOLDER, 'outer_folds_baseline')
 assert os.path.exists(ROOT_ORIGINAL_FOLDS)
+
+ROOT_ORIGINAL_FOLDS_CLAHE = os.path.join(CE_DATASET_FOLDER, 'outer_folds_clahe')
+assert os.path.exists(ROOT_ORIGINAL_FOLDS_CLAHE)
 
 CAC_NEGATIVE = 'CACSmenos400'
 CAC_POSITIVE = 'CACSmas400'
@@ -60,3 +63,5 @@ FOLD_FOLDER = 'folds'
 # =======================
 CAC_NORMALIZATION = os.path.join(CAC_DATASET_FOLDER, 'normalization.json')
 CE_NORMALIZATION = os.path.join(CE_DATASET_FOLDER, 'normalization.json')
+CE_NORMALIZATION_CLAHE = os.path.join(CE_DATASET_FOLDER, 'normalization_clahe.json')
+CE_NORMALIZATION_BASELINE = os.path.join(CE_DATASET_FOLDER, 'normalization_baseline.json')

@@ -281,8 +281,8 @@ class SummaryParser:
 
 if __name__ == '__main__':
     args = sys.argv
-    summary_file = '/home/ruben/PycharmProjects/MTLFramework/output/train/train_20221010_141912/summary.out'
-    output_file = '/home/ruben/PycharmProjects/MTLFramework/output/train/train_20221010_141912/summary.ltx'
+    summary_file = '/home/ruben/PycharmProjects/MTLFramework/output/train/train_20221023_091455_CLAHE/summary.out'
+    output_file = '/home/ruben/PycharmProjects/MTLFramework/output/train/train_20221023_091455_CLAHE/summary.ltx'
     section_list = ['configuration', 'global_performance', 'performance_by_outer_folds']
     sp = SummaryParser(summary_path=summary_file, output_path=output_file, sections=section_list)
     sp.generate()

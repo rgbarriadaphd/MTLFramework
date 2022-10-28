@@ -11,8 +11,6 @@ import json
 from PIL import Image, ImageStat
 import numpy as np
 
-BASE_PATH = '/home/ruben/PycharmProjects/MTLFramework/input/CAC'
-
 
 def get_custom_normalization(path):
     """
@@ -40,18 +38,19 @@ def get_custom_normalization(path):
 
 
 def main():
-    outer_folds = os.path.join(BASE_PATH, 'outer_folds')
+    base_path = '/home/ruben/PycharmProjects/MTLFramework/input/CE'
+    outer_folds = os.path.join(base_path, 'outer_folds_baseline')
 
     parameters = {}
-    for i in range(1, 10):
+    for i in range(1, 11):
         parameters[i] = {}
-        for j in range(1, 5):
+        for j in range(1, 6):
             src = os.path.join(outer_folds, f'outer_fold_{i}', f'inner_fold_{j}')
             assert os.path.exists(src)
             m, s = get_custom_normalization(src)
             parameters[i][j] = {'mean': m, 'std': s}
 
-    with open(os.path.join(BASE_PATH, 'normalization.json'), 'w') as f:
+    with open(os.path.join(base_path, 'normalization_baseline.json'), 'w') as f:
         json.dump(parameters, f)
 
 
